@@ -8,6 +8,7 @@ function transport(
     data: unknown;
     status?: number;
     headers?: Record<string, string>;
+    text?: string;
   }[],
 ) {
   const calls: { url: string; init?: RequestInit }[] = [];
@@ -15,10 +16,16 @@ function transport(
     calls.push({ url: String(input), init });
     const response = responses.shift();
     if (!response) throw new Error('Unexpected request in test');
-    return new Response(JSON.stringify(response.data), {
-      status: response.status ?? 200,
-      headers: { 'content-type': 'application/json', ...response.headers },
-    });
+    const result = new Response(
+      response.text ?? JSON.stringify(response.data),
+      {
+        status: response.status ?? 200,
+        headers: { 'content-type': 'application/json', ...response.headers },
+      },
+    );
+    // Native fetch supplies the response URL; pagination resolves links against it.
+    Object.defineProperty(result, 'url', { value: String(input) });
+    return result;
   });
   return {
     client: new OctokitGitHubClient(
@@ -31,6 +38,115 @@ function transport(
 }
 
 describe('Octokit transport (mock fetch, no network)', () => {
+  it('downloads job logs through a signed redirect without forwarding the App token', async () => {
+    const { client, calls } = transport([
+      {
+        data: null,
+        status: 302,
+        headers: {
+          location: 'https://logs.example.test/signed?signature=private',
+        },
+      },
+      {
+        data: null,
+        text: 'last log line',
+        headers: { 'content-type': 'text/plain' },
+      },
+    ]);
+    expect(await client.downloadJobLog(repo, 7)).toBe('last log line');
+    expect(calls[0]?.init?.redirect).toBe('manual');
+    expect(calls[0]?.url).toContain('/actions/jobs/7/logs');
+    expect(calls[1]?.init?.headers).toBeUndefined();
+    expect(calls[1]?.init?.redirect).toBe('error');
+  });
+  it('does not expose a signed log URL when the download fails', async () => {
+    const { client } = transport([
+      {
+        data: null,
+        status: 302,
+        headers: {
+          location: 'https://logs.example.test/signed?signature=private',
+        },
+      },
+      { data: 'failure', status: 403 },
+    ]);
+    await expect(client.downloadJobLog(repo, 7)).rejects.toThrow(
+      /^Job log download failed$/,
+    );
+  });
+  it('paginates run jobs and retains only normalized job metadata', async () => {
+    const { client, calls } = transport([
+      {
+        data: {
+          total_count: 2,
+          jobs: [{ id: 1, name: 'test', conclusion: 'failure' }],
+        },
+        headers: {
+          link: '<https://github.example.test/api/v3/repos/acme/widget/actions/runs/1234/jobs?page=2>; rel="next"',
+        },
+      },
+      {
+        data: {
+          total_count: 2,
+          jobs: [{ id: 2, name: 'lint', conclusion: 'success' }],
+        },
+      },
+    ]);
+    expect(await client.listWorkflowJobs(repo, 1234)).toEqual([
+      { id: 1, name: 'test', conclusion: 'failure' },
+      { id: 2, name: 'lint', conclusion: 'success' },
+    ]);
+    expect(calls[0]?.url).toContain('filter=latest');
+    expect(calls).toHaveLength(2);
+  });
+  it('extracts only PR cross-references hosted by the configured GitHub API', async () => {
+    const reference = (url: string) => ({
+      event: 'cross-referenced',
+      source: { issue: { pull_request: { url } } },
+    });
+    const { client } = transport([
+      {
+        data: [
+          { event: 'commented' },
+          reference(
+            'https://github.example.test/api/v3/repos/acme/widget/pulls/13',
+          ),
+          reference(
+            'https://github.example.test/api/v3/repos/acme/widget/pulls/13',
+          ),
+          reference('https://foreign.example.test/repos/acme/widget/pulls/14'),
+          reference(
+            'https://github.example.test/api/v3/repos/other/widget/pulls/15',
+          ),
+        ],
+      },
+    ]);
+    expect(await client.listIssueCrossReferences(repo, 12)).toEqual([
+      { repo, number: 13 },
+      { repo: 'other/widget', number: 15 },
+    ]);
+  });
+  it('lists all labeled issues but excludes pull requests returned by the Issues API', async () => {
+    const payload = JSON.parse(
+      readFileSync(
+        new URL('../fixtures/issues.opened.json', import.meta.url),
+        'utf8',
+      ),
+    ) as { issue: Record<string, unknown> };
+    const { client, calls } = transport([
+      {
+        data: [
+          payload.issue,
+          { ...payload.issue, number: 13, pull_request: { url: 'pr' } },
+        ],
+      },
+    ]);
+    expect(
+      await client.listIssues(repo, 'all', ['ai:in-progress']),
+    ).toHaveLength(1);
+    expect(calls[0]?.url).toContain('state=all');
+    expect(calls[0]?.url).toContain('labels=ai%3Ain-progress');
+  });
   it('removes only requested current assignees using DELETE, preserving human assignments', async () => {
     const payload = JSON.parse(
       readFileSync(

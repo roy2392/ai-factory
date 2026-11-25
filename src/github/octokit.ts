@@ -1,6 +1,7 @@
 import { Octokit } from '@octokit/rest';
 import { retry } from '@octokit/plugin-retry';
 import { throttling } from '@octokit/plugin-throttling';
+import { z } from 'zod';
 import { parseIssue, parsePullRequest } from '../context.js';
 import {
   repoParts,
@@ -13,16 +14,22 @@ import {
   type MergeMethod,
   type PullRequest,
   type Repository,
+  type WorkflowJob,
+  type CrossReference,
 } from './client.js';
 
 const Client = Octokit.plugin(retry, throttling);
 export class OctokitGitHubClient implements GitHubClient {
   readonly octokit: InstanceType<typeof Client>;
+  private readonly fetch: typeof globalThis.fetch;
+  private readonly apiOrigin: string;
   constructor(
     token: string,
     baseUrl = process.env.GITHUB_API_URL ?? 'https://api.github.com',
     fetch?: typeof globalThis.fetch,
   ) {
+    this.fetch = fetch ?? globalThis.fetch;
+    this.apiOrigin = new URL(baseUrl).origin;
     this.octokit = new Client({
       auth: token || undefined,
       baseUrl,
@@ -58,9 +65,10 @@ export class OctokitGitHubClient implements GitHubClient {
         issue_number: number,
         per_page: 100,
       })
-    ).map(({ id, body, user }) => ({
+    ).map(({ id, body, user, created_at }) => ({
       id,
       body: body ?? '',
+      created_at,
       user: user ? { login: user.login, type: user.type } : null,
     }));
   }
@@ -258,5 +266,105 @@ export class OctokitGitHubClient implements GitHubClient {
         issue_number: number,
         assignees: current,
       });
+  }
+  async listWorkflowJobs(repo: string, runId: number): Promise<WorkflowJob[]> {
+    return (
+      await this.octokit.paginate(
+        this.octokit.rest.actions.listJobsForWorkflowRun,
+        { ...repoParts(repo), run_id: runId, filter: 'latest', per_page: 100 },
+      )
+    ).map(({ id, name, conclusion }) => ({ id, name, conclusion }));
+  }
+  async downloadJobLog(repo: string, jobId: number): Promise<string> {
+    const response =
+      await this.octokit.rest.actions.downloadJobLogsForWorkflowRun({
+        ...repoParts(repo),
+        job_id: jobId,
+        request: { redirect: 'manual' },
+      });
+    if (response.status !== 302 || !response.headers.location)
+      throw new Error('Job log endpoint did not return a download location');
+    const url = new URL(response.headers.location);
+    if (url.protocol !== 'https:' || url.username || url.password)
+      throw new Error('Invalid job log download location');
+    // Signed download URLs are credentials: never log them or forward the App token.
+    try {
+      const download = await this.fetch(url.href, {
+        redirect: 'error',
+        signal: AbortSignal.timeout(60000),
+      });
+      if (!download.ok) throw new Error('Job log download failed');
+      return await download.text();
+    } catch {
+      throw new Error('Job log download failed');
+    }
+  }
+  async listPullRequests(
+    repo: string,
+    state: 'open' | 'closed' | 'all',
+  ): Promise<PullRequest[]> {
+    return (
+      await this.octokit.paginate(this.octokit.rest.pulls.list, {
+        ...repoParts(repo),
+        state,
+        sort: 'updated',
+        direction: 'asc',
+        per_page: 100,
+      })
+    ).map(parsePullRequest);
+  }
+  async listIssues(
+    repo: string,
+    state: 'open' | 'closed' | 'all',
+    labels: string[],
+  ): Promise<Issue[]> {
+    return (
+      await this.octokit.paginate(this.octokit.rest.issues.listForRepo, {
+        ...repoParts(repo),
+        state,
+        labels: labels.join(','),
+        sort: 'updated',
+        direction: 'asc',
+        per_page: 100,
+      })
+    )
+      .filter((issue) => !issue.pull_request)
+      .map(parseIssue);
+  }
+  async listIssueCrossReferences(
+    repo: string,
+    number: number,
+  ): Promise<CrossReference[]> {
+    const events = await this.octokit.paginate(
+      this.octokit.rest.issues.listEventsForTimeline,
+      { ...repoParts(repo), issue_number: number, per_page: 100 },
+    );
+    const schema = z.object({
+      event: z.literal('cross-referenced'),
+      source: z.object({
+        issue: z.object({ pull_request: z.object({ url: z.url() }) }),
+      }),
+    });
+    const result = new Map<string, CrossReference>();
+    for (const event of events) {
+      const parsed = schema.safeParse(event);
+      if (!parsed.success) continue;
+      const url = new URL(parsed.data.source.issue.pull_request.url);
+      const match = /\/repos\/([^/]+)\/([^/]+)\/pulls\/([1-9]\d*)$/.exec(
+        url.pathname,
+      );
+      if (
+        url.origin !== this.apiOrigin ||
+        !match ||
+        !Number.isSafeInteger(Number(match[3]))
+      )
+        continue;
+      const reference = {
+        repo: `${match[1]}/${match[2]}`,
+        number: Number(match[3]),
+      };
+      result.set(`${reference.repo}#${reference.number}`, reference);
+    }
+    return [...result.values()];
   }
 }

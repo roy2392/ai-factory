@@ -3,8 +3,24 @@
   "workflow_run": {
     "id": 1234,
     "head_branch": "copilot/add-health",
-    "conclusion": "failure"
+    "conclusion": "failure",
+    "name": "CI",
+    "event": "pull_request",
+    "head_sha": "abc123",
+    "head_repository": {
+      "full_name": "acme/widget"
+    },
+    "repository": {
+      "full_name": "acme/widget"
+    },
+    "html_url": "https://github.com/acme/widget/actions/runs/1234"
   },
-  "repository": { "full_name": "acme/widget", "default_branch": "main" },
-  "sender": { "login": "copilot-swe-agent[bot]", "type": "Bot" }
+  "repository": {
+    "full_name": "acme/widget",
+    "default_branch": "main"
+  },
+  "sender": {
+    "login": "copilot-swe-agent[bot]",
+    "type": "Bot"
+  }
 }

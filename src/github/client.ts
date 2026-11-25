@@ -9,6 +9,7 @@ export interface Actor {
 }
 
 export interface Issue {
+  updated_at?: string;
   title?: string;
   number: number;
   html_url: string;
@@ -22,13 +23,15 @@ export interface Issue {
 }
 
 export interface PullRequest {
+  updated_at?: string;
+  merged_at?: string | null;
   number: number;
   node_id: string;
   state: 'open' | 'closed';
   user: Actor | null;
   body: string | null;
   draft: boolean;
-  head: { ref: string; repo: { full_name: string } | null };
+  head: { ref: string; sha?: string; repo: { full_name: string } | null };
   base: { ref: string; repo: { full_name: string } };
   auto_merge: { merge_method: string } | null;
   labels: string[];
@@ -37,9 +40,30 @@ export interface PullRequest {
 }
 
 export interface Comment {
+  created_at?: string;
   id: number;
   body: string;
   user?: Actor | null;
+}
+export interface WorkflowJob {
+  id: number;
+  name: string;
+  conclusion: string | null;
+}
+export interface CrossReference {
+  repo: string;
+  number: number;
+}
+export interface WorkflowRun {
+  id: number;
+  name: string;
+  event: string;
+  head_branch: string | null;
+  head_sha: string;
+  head_repository: { full_name: string } | null;
+  repository: { full_name: string };
+  conclusion: string | null;
+  html_url: string;
 }
 export interface Label {
   name: string;
@@ -63,6 +87,21 @@ export interface Assignment {
 }
 
 export interface GitHubClient {
+  listWorkflowJobs(repo: string, runId: number): Promise<WorkflowJob[]>;
+  downloadJobLog(repo: string, jobId: number): Promise<string>;
+  listPullRequests(
+    repo: string,
+    state: 'open' | 'closed' | 'all',
+  ): Promise<PullRequest[]>;
+  listIssues(
+    repo: string,
+    state: 'open' | 'closed' | 'all',
+    labels: string[],
+  ): Promise<Issue[]>;
+  listIssueCrossReferences(
+    repo: string,
+    number: number,
+  ): Promise<CrossReference[]>;
   getIssue(repo: string, number: number): Promise<Issue>;
   listIssueComments(repo: string, number: number): Promise<Comment[]>;
   createComment(repo: string, number: number, body: string): Promise<void>;

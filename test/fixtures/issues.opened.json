@@ -4,12 +4,22 @@
     "number": 12,
     "html_url": "https://github.com/acme/widget/issues/12",
     "state": "open",
-    "user": { "login": "maintainer", "type": "User" },
+    "user": {
+      "login": "maintainer",
+      "type": "User"
+    },
     "author_association": "MEMBER",
     "body": "Add a /health endpoint that returns 200 OK.",
     "labels": [],
-    "assignees": []
+    "assignees": [],
+    "updated_at": "2026-11-25T00:00:00Z"
   },
-  "repository": { "full_name": "acme/widget", "default_branch": "main" },
-  "sender": { "login": "maintainer", "type": "User" }
+  "repository": {
+    "full_name": "acme/widget",
+    "default_branch": "main"
+  },
+  "sender": {
+    "login": "maintainer",
+    "type": "User"
+  }
 }

@@ -1,10 +1,16 @@
 import { readFileSync } from 'node:fs';
 import { z } from 'zod';
-import { repoParts, type Issue, type PullRequest } from './github/client.js';
+import {
+  repoParts,
+  type Issue,
+  type PullRequest,
+  type WorkflowRun,
+} from './github/client.js';
 
 const actor = z.object({ login: z.string().min(1), type: z.string() });
 const label = z.union([z.string(), z.object({ name: z.string() })]);
 const issueSchema = z.object({
+  updated_at: z.string().optional(),
   title: z.string().optional(),
   number: z.number().int().positive(),
   html_url: z.string(),
@@ -21,6 +27,8 @@ const issueSchema = z.object({
   pull_request: z.unknown().optional(),
 });
 const prSchema = z.object({
+  updated_at: z.string().optional(),
+  merged_at: z.string().nullable().optional(),
   number: z.number().int().positive(),
   node_id: z.string().min(1),
   state: z.enum(['open', 'closed']),
@@ -29,6 +37,7 @@ const prSchema = z.object({
   draft: z.boolean(),
   head: z.object({
     ref: z.string(),
+    sha: z.string().optional(),
     repo: z.object({ full_name: z.string() }).nullable(),
   }),
   base: z.object({
@@ -78,11 +87,7 @@ export type FactoryEvent = BaseEvent &
     | {
         name: 'workflow_run';
         action: string;
-        workflowRun: {
-          id: number;
-          head_branch: string | null;
-          conclusion: string | null;
-        };
+        workflowRun: WorkflowRun;
       }
     | { name: 'schedule'; schedule: string }
     | { name: 'workflow_dispatch'; inputs: Record<string, unknown> }
@@ -159,9 +164,15 @@ export function readEvent(env: NodeJS.ProcessEnv = process.env): FactoryEvent {
         action: z.string().parse(payload.action),
         workflowRun: z
           .object({
-            id: z.number(),
+            id: z.number().int().positive(),
+            name: z.string(),
+            event: z.string(),
             head_branch: z.string().nullable(),
+            head_sha: z.string().min(1),
+            head_repository: z.object({ full_name: z.string() }).nullable(),
+            repository: z.object({ full_name: z.string() }),
             conclusion: z.string().nullable(),
+            html_url: z.url(),
           })
           .parse(payload.workflow_run),
       };

@@ -8,6 +8,8 @@ import type {
   MergeMethod,
   PullRequest,
   Repository,
+  WorkflowJob,
+  CrossReference,
 } from './client.js';
 
 export interface WriteCall {
@@ -15,6 +17,10 @@ export interface WriteCall {
   args: unknown[];
 }
 export class FakeState {
+  now = new Date().toISOString();
+  jobs = new Map<string, WorkflowJob[]>();
+  jobLogs = new Map<string, string>();
+  crossReferences = new Map<string, CrossReference[]>();
   repositories = new Map<string, Repository>();
   issues = new Map<string, Issue>();
   pullRequests = new Map<string, PullRequest>();
@@ -68,9 +74,15 @@ export class FakeGitHubClient implements GitHubClient {
             ...[...this.state.comments.values()].flat().map((c) => c.id),
           ) + 1,
         body,
-        user: { login: 'ai-factory[bot]', type: 'Bot' },
+        user:
+          this.identity === 'user'
+            ? { login: 'factory-bot', type: 'User' }
+            : { login: 'ai-factory[bot]', type: 'Bot' },
+        created_at: this.state.now,
       },
     ]);
+    const item = this.state.issues.get(key) ?? this.state.pullRequests.get(key);
+    if (item) item.updated_at = this.state.now;
   }
   async updateComment(repo: string, id: number, body: string): Promise<void> {
     for (const [key, comments] of this.state.comments) {
@@ -102,6 +114,7 @@ export class FakeGitHubClient implements GitHubClient {
     if (missing.length) {
       this.record('addLabels', repo, number, missing);
       item.labels.push(...missing);
+      item.updated_at = this.state.now;
     }
   }
   async removeLabel(
@@ -116,6 +129,7 @@ export class FakeGitHubClient implements GitHubClient {
     if (item.labels.includes(label)) {
       this.record('removeLabel', repo, number, label);
       item.labels = item.labels.filter((v) => v !== label);
+      item.updated_at = this.state.now;
     }
   }
   async ensureLabels(
@@ -238,5 +252,48 @@ export class FakeGitHubClient implements GitHubClient {
         ({ login }) => !assignees.includes(login),
       );
     }
+  }
+  async listWorkflowJobs(repo: string, runId: number): Promise<WorkflowJob[]> {
+    return structuredClone(this.state.jobs.get(`${repo}#${runId}`) ?? []);
+  }
+  async downloadJobLog(repo: string, jobId: number): Promise<string> {
+    return this.required(this.state.jobLogs.get(`${repo}#${jobId}`));
+  }
+  async listPullRequests(
+    repo: string,
+    state: 'open' | 'closed' | 'all',
+  ): Promise<PullRequest[]> {
+    return structuredClone(
+      [...this.state.pullRequests.values()].filter(
+        (pr) =>
+          pr.base.repo.full_name === repo &&
+          (state === 'all' || pr.state === state),
+      ),
+    );
+  }
+  async listIssues(
+    repo: string,
+    state: 'open' | 'closed' | 'all',
+    labels: string[],
+  ): Promise<Issue[]> {
+    return structuredClone(
+      [...this.state.issues.entries()]
+        .filter(
+          ([key, issue]) =>
+            key.startsWith(`${repo}#`) &&
+            !issue.pull_request &&
+            (state === 'all' || issue.state === state) &&
+            labels.every((label) => issue.labels.includes(label)),
+        )
+        .map(([, issue]) => issue),
+    );
+  }
+  async listIssueCrossReferences(
+    repo: string,
+    number: number,
+  ): Promise<CrossReference[]> {
+    return structuredClone(
+      this.state.crossReferences.get(`${repo}#${number}`) ?? [],
+    );
   }
 }

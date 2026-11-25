@@ -34,19 +34,11 @@ export function buildCliArgs({
     'read',
     '--allow-tool',
     'write',
+    // Permission rules cannot constrain git options (-c aliases, pagers,
+    // external diff/textconv) or find -exec. Built-in read tools cover discovery.
+    // Deny all shell execution, including implicitly classified read-only commands.
     ...[
-      'git status',
-      'git log',
-      'git diff',
-      'git show',
-      'git ls-files',
-      'git grep',
-      'ls',
-      'cat',
-      'grep',
-      'find',
-    ].flatMap((command) => ['--allow-tool', `shell(${command})`]),
-    ...[
+      'shell',
       'shell(git push)',
       'shell(gh:*)',
       'shell(curl:*)',

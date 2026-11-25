@@ -39,6 +39,17 @@ describe('Copilot CLI invocation', () => {
       expect(args).not.toContain('shell(git:*)');
       expect(args).not.toContain('--allow-all-tools');
       expect(args).not.toContain('--trust-folder');
+      const allowed = args.flatMap((arg, i) =>
+        arg === '--allow-tool' ? [args[i + 1]] : [],
+      );
+      const denied = args.flatMap((arg, i) =>
+        arg === '--deny-tool' ? [args[i + 1]] : [],
+      );
+      expect(allowed).toEqual(['read', 'write']);
+      expect(denied).toContain('shell');
+      // Covers find -exec and every git pager/alias/external-diff/textconv variant:
+      // no shell command is granted permission, regardless of its arguments.
+      expect(allowed.some((rule) => rule?.startsWith('shell'))).toBe(false);
       const help = readFileSync(
         `docs/reference/copilot-cli-${COPILOT_CLI_VERSION}-help.txt`,
         'utf8',

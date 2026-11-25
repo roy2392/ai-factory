@@ -101,3 +101,56 @@ describe('Phase 2 workflow isolation', () => {
     );
   });
 });
+
+describe('Phase 3 workflow isolation', () => {
+  it.each(['self-heal', 'watchdog'])(
+    'checks out only trusted factory code for %s',
+    (command) => {
+      const file = workflow(`reusable-${command}`);
+      const job = file.jobs[command]!;
+      expect(file.permissions).toEqual({});
+      expect(file.concurrency?.['cancel-in-progress']).toBe(false);
+      const checkouts = job.steps!.filter((step) =>
+        step.uses?.startsWith('actions/checkout'),
+      );
+      expect(checkouts).toHaveLength(1);
+      expect(checkouts[0]?.with).toMatchObject({
+        repository: '${{ inputs.factory_repo }}',
+        ref: '${{ inputs.factory_ref }}',
+        path: '.factory',
+        'persist-credentials': false,
+      });
+      expect(JSON.stringify(job.steps)).not.toMatch(
+        /head_sha|head\.sha|pull_request\.head|workflow_run\.head_repository/,
+      );
+      const execution = job.steps!.find((step) =>
+        step.run?.includes(`src/cli.ts ${command}`),
+      )!;
+      expect(execution.env?.APP_TOKEN).toBe('${{ steps.app.outputs.token }}');
+      expect(JSON.stringify(job)).not.toContain('COPILOT_CLI_TOKEN');
+      if (command === 'self-heal') {
+        expect(job.permissions).toEqual({
+          actions: 'read',
+          'pull-requests': 'write',
+          issues: 'write',
+        });
+        expect(job['timeout-minutes']).toBe(10);
+        expect(execution.env?.USER_TOKEN).toBe(
+          '${{ secrets.COPILOT_ASSIGN_TOKEN }}',
+        );
+        expect(file.concurrency?.group).toBe(
+          'ai-factory-pr-${{ github.event.workflow_run.head_branch }}',
+        );
+      } else {
+        expect(job.permissions).toEqual({
+          issues: 'write',
+          'pull-requests': 'write',
+        });
+        expect(job['timeout-minutes']).toBe(15);
+        expect(JSON.stringify(file)).not.toMatch(
+          /USER_TOKEN|COPILOT_ASSIGN_TOKEN/,
+        );
+      }
+    },
+  );
+});

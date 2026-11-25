@@ -1,0 +1,70 @@
+name: Factory watchdog
+on:
+  workflow_call:
+    inputs:
+      factory_repo:
+        type: string
+        required: true
+      factory_ref:
+        type: string
+        default: v1
+    secrets:
+      FACTORY_APP_ID:
+        required: true
+      FACTORY_APP_PRIVATE_KEY:
+        required: true
+permissions: {}
+concurrency:
+  group: ai-factory-watchdog-${{ github.repository }}
+  cancel-in-progress: false
+jobs:
+  watchdog:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      issues: write
+      pull-requests: write
+    steps:
+      - name: Resolve repositories
+        id: repos
+        env:
+          FACTORY_REPO: ${{ inputs.factory_repo }}
+        shell: bash
+        run: |
+          if [[ "$FACTORY_REPO" != "$GITHUB_REPOSITORY_OWNER/"* ]]; then
+            echo '::error::The factory and target repositories must share an owner for one installation token.'
+            exit 1
+          fi
+          echo "factory=${FACTORY_REPO#*/}" >> "$GITHUB_OUTPUT"
+          echo "target=${GITHUB_REPOSITORY#*/}" >> "$GITHUB_OUTPUT"
+      - uses: actions/create-github-app-token@v2
+        id: app
+        with:
+          app-id: ${{ secrets.FACTORY_APP_ID }}
+          private-key: ${{ secrets.FACTORY_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: |
+            ${{ steps.repos.outputs.target }}
+            ${{ steps.repos.outputs.factory }}
+          permission-contents: read
+          permission-pull-requests: write
+          permission-issues: write
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ inputs.factory_repo }}
+          ref: ${{ inputs.factory_ref }}
+          path: .factory
+          token: ${{ steps.app.outputs.token }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: .factory/package-lock.json
+      - run: npm ci
+        working-directory: .factory
+      - run: npx --no-install tsx src/cli.ts watchdog
+        working-directory: .factory
+        env:
+          APP_TOKEN: ${{ steps.app.outputs.token }}
+          FACTORY_APP_LOGIN: ${{ steps.app.outputs.app-slug }}[bot]

@@ -1,19 +1,8 @@
 import { isCopilot } from '../copilot.js';
 import { notice, type Dependencies } from './types.js';
 
-export function linkedIssues(body: string | null, repo: string): number[] {
-  const issues = new Set<number>();
-  // Only local shorthand or explicitly same-repository references; never infer URL ownership.
-  for (const match of (body ?? '').matchAll(
-    /\b(?:fixes|closes|resolves)\s+(?:([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+))?#([1-9]\d*)\b/gi,
-  )) {
-    if (!match[1] || match[1].toLowerCase() === repo.toLowerCase()) {
-      const number = Number(match[2]);
-      if (Number.isSafeInteger(number)) issues.add(number);
-    }
-  }
-  return [...issues];
-}
+import { linkedIssues } from '../links.js';
+export { linkedIssues } from '../links.js';
 
 export async function run({
   event,
@@ -111,6 +100,8 @@ export async function run({
   // so checking that list alone would request them again on a later webhook/rerun.
   if (!reviewInitialized)
     await appClient.addLabels(event.repo, pr.number, ['ai:awaiting-review']);
+  if (pr.labels.includes('ai:stale'))
+    await appClient.removeLabel(event.repo, pr.number, 'ai:stale');
   const linked = linkedIssues(pr.body, event.repo);
   if (linked.length)
     log(`Linked issues: ${linked.map((n) => `#${n}`).join(', ')}`);

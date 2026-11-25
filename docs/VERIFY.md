@@ -1,4 +1,4 @@
-# Factory verification: Phases 1 and 2
+# Factory verification: Phases 1–3
 
 ## Local checks
 
@@ -74,8 +74,8 @@ of the local tests.
 9. Inspect run logs: no tokens or full webhook payloads, and factory checkout
    only in `pull_request_target`. The automerge job has no user token.
 
-Self-heal, watchdog, and requirements execution are later phases. The Phase 2
-command and planning checks are below.
+Requirements execution is a later phase. Phase 2 command/planning and Phase 3
+self-heal/watchdog checks are below.
 
 ## Accepted Phase 1 interpretations
 
@@ -91,8 +91,8 @@ The planner accepted these interpretations after reviewing commit `c988b51`.
 - A single installation token is scoped to one owner; cross-owner targets fail
   explicitly before checkout; the same-owner requirement is documented in setup.
 - Linked issue references are parsed and reported, without mutating the issue:
-  Phase 1 specifies no linked-issue write. Phase 3 adds removing `ai:stale` in
-  automerge; that is not implemented in Phase 2.
+  Phase 1 specifies no linked-issue write. Phase 3 adds removing `ai:stale` on
+  ready PRs in automerge and linked-issue cleanup through watchdog.
 - Within automerge step 3, reviewers are requested before adding
   `ai:awaiting-review`. The label marks completed review setup, preventing reruns
   from requesting already-completed reviews after GitHub clears the pending
@@ -129,9 +129,14 @@ experimental features, and BASH_ENV; it does not trust repository hooks. The pla
 prompt receives the default-branch AGENTS.md explicitly.
 
 `buildCliArgs` passes the prompt contents as one `-p` argv entry with
-`--no-ask-user`. It allows read/write tools and the specified shell exploration
-commands, limiting git to read-oriented subcommands rather than `git:*`. It
-explicitly denies git push, gh, curl, wget, URL tools and memory. As specified,
+`--no-ask-user`. Following the Phase 3 security review, its exact allow list is
+now **`read`, `write`**, with a blanket **`--deny-tool shell`**. Built-in read tools
+provide file discovery. There are no shell allows for find, git, or other commands.
+This blocks `find -exec`, git pagers, `--ext-diff`, `--textconv`, and `-c` aliases
+without relying on permission rules to understand their flags. The captured CLI
+permissions reference says an unqualified shell deny matches all shell commands
+and deny rules override allows. The explicit git push, gh, curl, wget, URL and
+memory denies remain as well. As specified,
 write is allowed in this disposable workspace; the prompt limits output to
 `out/plan.md` or `out/answer.md`. These CLI permission rules and prompts are not
 proof of model compliance; inspect the live output during the smoke test.
@@ -219,9 +224,123 @@ router configured?`. Expect one eyes reaction, route `mode=ask`, a read-only
    checkout credentials not persisted, only target default-branch code read,
    private factory code available via the trusted source artifact.
 
-## Phase 2 planner questions
+## Accepted Phase 2 interpretations
 
-Confirm the private-factory source-artifact handoff, distinct nested concurrency
-group, and conservative malformed/missing-plan handling described above. The
+The planner accepted the private-factory source-artifact handoff, distinct nested
+concurrency group, and conservative malformed/missing-plan handling after
+reviewing commit `917c2ca`. The
 specific `issues: read` prompt-building exception is followed despite the broader
-“contents: read only” wording. No Phase 3 or requirements execution is included.
+“contents: read only” wording.
+
+## Phase 3 local verification and design choices
+
+Run the same local checks at the top of this document. New tests cover the exact
+Copilot tool allow list, log tails/redaction, self-heal filters and identity split,
+label-failure recovery, watchdog timestamps and linked PRs, cleanup after closure,
+the 50-item cap, CLI dry-runs, and both workflows' checkout/token boundaries.
+Transport tests use mocked fetch; command tests use the in-memory GitHub client.
+No live Copilot session, GitHub write, or sandbox escape is part of local verification.
+
+The Phase 3 verification uses Node.js 24.16.0 and actionlint 1.7.7. The default
+`npm ci` cache under `~/.npm` was not writable in the sandbox; installation
+succeeded with `npm ci --cache /private/tmp/ai-factory-npm-cache`. No changes to
+the global cache or elevated commands were needed. The final lint, typecheck,
+Vitest suite (25 files, 243 tests), and actionlint checks pass. Actionlint covers
+all factory workflows and the target caller template. No runtime dependency was
+added.
+
+Self-heal accepts only failed/timed-out pull-request runs from the target repo.
+It requires one matching open Copilot PR and the exact current head SHA, rechecking
+the SHA after downloading logs. `COPILOT_BOT_LOGIN` identifies the user-token
+comment author; `FACTORY_APP_LOGIN` identifies the App. Other commenters cannot
+forge trusted repair receipts. Ambiguous branch matches are skipped.
+
+The App reads at most three failed jobs' logs. Each retains at most 150 lines;
+ANSI escapes and timestamps are removed. Lines matching `ghp_`, `github_pat_`,
+`ghs_`, or key BEGIN headers are redacted; complete multi-line key blocks are also
+redacted. The combined log excerpt stays within 20,000 characters and UTF-8 bytes.
+HTML/factory marker and Markdown fence injection in logs is neutralized. Logs
+are posted as data and are never executed or printed raw by the factory.
+
+GitHub's [job-log endpoint](https://docs.github.com/en/rest/actions/workflow-jobs#download-job-logs-for-a-workflow-run)
+returns a short-lived signed download URL. The implementation reads the redirect
+explicitly and downloads over HTTPS without forwarding the App authorization
+header. It never logs the signed URL, including on download failure.
+
+The repair request is posted with the **user client**, starting with a bold status
+line and containing `@copilot`, the run link, instructions, log excerpt, and the
+`self-heal run=… attempt=…` marker. **The comment is posted before rotating the
+labels**, reversing spec steps 7–8: the durable receipt lets a rerun finish label
+rotation without sending another repair or consuming an extra attempt. Existing
+receipts also protect the counter if a different run arrives before labels recover.
+Adding the new counter before removing older counters avoids a transient zero.
+Only the App writes labels. At the configured limit, the App adds `ai:human-needed`
+and posts one escalation for that PR; later failing runs do not repeat it.
+
+Watchdog scans repository PR metadata and labeled issues with pagination, then
+processes **at most 50 PR/issue candidates** in oldest-update order per run.
+Metadata indexing and linked-record reads are not counted as processed candidates;
+this preserves complete link knowledge when deciding that an issue has no open PR.
+It scans all open Copilot PRs, including ready PRs, and resolves local timeline
+cross-references without using GitHub Search. An open linked human PR also prevents
+a false stale-issue alert. Cross-repository references are ignored.
+
+For stale notices, the App adds the label before posting the comment. The comment's
+timestamp then covers the factory's own label change; equal timestamps count as
+already notified. Repeated schedule runs do not treat these writes as new user
+activity. Later real activity can become stale again and receive a new notice.
+A stale draft PR mentions the author of its first same-repo linked issue when
+available; it does not invent an author when no issue link is present.
+
+Closed/merged Copilot PRs cause watchdog to remove `ai:in-progress` and
+`ai:awaiting-review` from their linked issues, including closed issues. Cleanup is
+deferred when a replacement linked PR is still open. Automerge clears `ai:stale`
+on an eligible ready PR. The stale label on linked issues is not removed by
+automerge: that additional issue write is not specified and would require broader
+permissions for the automerge workflow.
+
+`reusable-self-heal.yml` has a 10-minute timeout and per-head-branch concurrency;
+`reusable-watchdog.yml` has a 15-minute timeout and repository-wide concurrency.
+Both check out only `inputs.factory_repo` at `inputs.factory_ref`, never the
+target repo or PR code. Their App token includes contents read for the trusted
+factory checkout and default-branch config reads. Workflow-token job permissions
+match the Phase 3 table; watchdog receives no user or Copilot CLI token.
+
+## Phase 3 GitHub smoke test (human)
+
+1. Deploy the reviewed revision to the configured factory ref and update the
+   caller YAML. Replace `workflow_run.workflows: [CI]` with the actual workflow
+   names. The caller enables the half-hour schedule and manual watchdog dispatch.
+   Verify the App has Actions read, Issues write, Pull requests write, and Contents
+   read, and both identity variables are available where required.
+2. On a same-repo Copilot PR in a sandbox target, introduce a failing CI test.
+   Confirm self-heal reads only that run's logs, posts the `@copilot` request as
+   the licensed **bot user**, and uses the App to set `ai:fix-1`. Verify the log
+   excerpt and run link. Confirm Copilot actually pushes a fix and CI runs again.
+3. Rerun the self-heal workflow for the same failed run: expect no second repair
+   request and no extra attempt. Trigger a newer push before an older run completes:
+   the older run must be skipped by SHA. Fork runs, non-PR runs, successful runs,
+   and human-authored PRs must produce no writes.
+4. Let a sandbox PR reach `max_fix_attempts` (or temporarily set the limit to zero).
+   Expect `ai:human-needed`, one App-authored escalation mentioning `escalate_to`,
+   and no further user-authored repair requests. Verify later failures do not spam
+   escalation comments. Test label-write failure/retry if feasible.
+5. Leave a draft Copilot PR inactive beyond `stale_hours` (use a short supported
+   threshold for the sandbox). Run watchdog manually. Expect `ai:stale` and one
+   notice mentioning the linked issue author. Repeat immediately and after another
+   stale interval without activity: no repeated notice. New activity followed by
+   another stale interval should permit a new notice.
+6. Test an assigned in-progress issue without a PR, then issues with a ready PR and
+   a timeline-only PR link. Only the first should get an orphaned-issue notice.
+   Close/merge a linked Copilot PR and verify issue-label cleanup. Keep a replacement
+   PR open to verify active work is preserved.
+7. Mark a stale Copilot PR ready and confirm automerge removes its stale label.
+   Review watchdog's summary table and 50-item cap. Inspect both workflow checkouts
+   and environments to confirm no PR code execution and the intended identity split.
+
+## Phase 3 planner questions
+
+Confirm the comment-before-counter repair ordering, label-before-notice watchdog
+ordering, one escalation per exhausted PR, and cleanup deferral while another
+linked PR is open. Confirm that automerge's stale-label removal should remain
+PR-only. No Phase 4 requirements engine is implemented.

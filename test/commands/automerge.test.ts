@@ -4,6 +4,17 @@ import type { PullRequest } from '../../src/github/client.js';
 import { repo, setup } from '../helpers.js';
 
 describe('automerge command', () => {
+  it('clears the stale label on a ready Copilot PR, without changing linked issues', async () => {
+    const { deps, state } = setup('pull_request_target');
+    const pr = state.pullRequests.get(`${repo}#13`)!;
+    pr.labels = ['ai:stale'];
+    await run(deps);
+    await run(deps);
+    expect(pr.labels).not.toContain('ai:stale');
+    expect(state.writes.filter((w) => w.method === 'removeLabel')).toEqual([
+      { method: 'removeLabel', args: [repo, 13, 'ai:stale'], identity: 'app' },
+    ]);
+  });
   it.each<[string, Partial<PullRequest>]>([
     ['non-copilot-author', { user: { login: 'human', type: 'User' } }],
     ['draft', { draft: true }],

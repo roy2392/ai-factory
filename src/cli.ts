@@ -14,6 +14,8 @@ import * as aiCommand from './commands/ai-command.js';
 import * as buildPrompt from './commands/build-prompt.js';
 import * as post from './commands/post.js';
 import { parseMode } from './copilot-cli.js';
+import * as selfHeal from './commands/self-heal.js';
+import * as watchdog from './commands/watchdog.js';
 
 function escapeAnnotation(value: string): string {
   return value.replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A');
@@ -67,10 +69,12 @@ export async function main(
         'build-prompt',
         'post-plan',
         'post-answer',
+        'self-heal',
+        'watchdog',
       ].includes(command ?? '')
     )
       throw new Error(
-        'Usage: factory dispatch|automerge|labels|ai-command|build-prompt|post-plan|post-answer [--dry-run] [--repo OWNER/REPO (labels only)] [--mode ask|plan (build-prompt only)] [--output-dir PATH (prompt/post only)]',
+        'Usage: factory dispatch|automerge|labels|ai-command|build-prompt|post-plan|post-answer|self-heal|watchdog [--dry-run] [--repo OWNER/REPO (labels only)] [--mode ask|plan (build-prompt only)] [--output-dir PATH (prompt/post only)]',
       );
     if (values.repo && command !== 'labels')
       throw new Error('--repo is only supported for labels');
@@ -96,10 +100,12 @@ export async function main(
           ? 'GITHUB_TOKEN is required for build-prompt'
           : 'APP_TOKEN is required',
       );
-    const needsUser = command === 'dispatch' || command === 'ai-command';
+    const needsUser = ['dispatch', 'ai-command', 'self-heal'].includes(
+      command!,
+    );
     if (!values['dry-run'] && needsUser && !env.USER_TOKEN)
       throw new Error(
-        'USER_TOKEN (COPILOT_ASSIGN_TOKEN) is required for dispatch/ai-command',
+        'USER_TOKEN (COPILOT_ASSIGN_TOKEN) is required for dispatch/ai-command/self-heal',
       );
     let appClient = createClient(token ?? '', env.GITHUB_API_URL);
     // Automerge and labels never instantiate a user-token client.
@@ -145,6 +151,8 @@ export async function main(
           env.GITHUB_OUTPUT,
           `mode=${result.mode}\nissue=${result.issue}\ncomment_id=${result.comment_id}\n`,
         );
+    } else if (command === 'self-heal' || command === 'watchdog') {
+      await (command === 'self-heal' ? selfHeal : watchdog).run(deps);
     } else {
       await (command === 'labels' ? labels : automerge).run(deps);
     }
