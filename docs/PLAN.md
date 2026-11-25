@@ -17,7 +17,7 @@ the spec and the acceptance criteria → fixes go back to Codex (resume) → pha
 | 2 | `/ai` commands and the plan gate | [phase-2](specs/phase-2-commands-plan-gate.md) | **done** |
 | 3 | Self-heal and watchdog | [phase-3](specs/phase-3-self-heal-watchdog.md) | **done** |
 | 4 | Requirements engine (sub-issues, dependencies, release) | [phase-4](specs/phase-4-requirements.md) | **done** |
-| 5 | Rollout: showcase repo, eval set, metrics | [phase-5](specs/phase-5-rollout.md) | metrics in progress (Codex); rollout = human |
+| 5 | Rollout: showcase repo, eval set, metrics | [phase-5](specs/phase-5-rollout.md) | metrics **done**; rollout = human (SETUP.md + VERIFY.md) |
 
 ## Definition of done (every phase)
 - All acceptance criteria in the spec are met, and the tests named in the spec exist and pass.
