@@ -19,6 +19,9 @@ Create two fine-grained PATs on the bot user, scoped to the target repositories:
 
 Set an expiry and a calendar reminder to rotate them.
 
+Also set an organization **variable** (not a secret) `COPILOT_BOT_LOGIN` = the bot user's login. Automerge
+uses it so the bot is never requested as a reviewer of its own PRs.
+
 ## 3. GitHub App
 Create the App `ai-factory` (no webhook needed: workflows are triggered by Actions events).
 
@@ -27,6 +30,7 @@ Create the App `ai-factory` (no webhook needed: workflows are triggered by Actio
 - Install it on the target repositories.
 - Store `FACTORY_APP_ID` and `FACTORY_APP_PRIVATE_KEY` as **organization secrets**, available to the
   target repositories.
+- The factory repo and the target repos must have the **same owner** (one installation token covers both).
 - Also install it on the **ai-factory** repository itself: reusable workflows use the App token to check
   out the factory code when the factory repo is private.
 

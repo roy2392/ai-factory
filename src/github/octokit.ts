@@ -1,0 +1,242 @@
+import { Octokit } from '@octokit/rest';
+import { retry } from '@octokit/plugin-retry';
+import { throttling } from '@octokit/plugin-throttling';
+import { parseIssue, parsePullRequest } from '../context.js';
+import {
+  repoParts,
+  type Assignment,
+  type Comment,
+  type GitHubClient,
+  type Issue,
+  type Label,
+  type LabelResult,
+  type MergeMethod,
+  type PullRequest,
+  type Repository,
+} from './client.js';
+
+const Client = Octokit.plugin(retry, throttling);
+export class OctokitGitHubClient implements GitHubClient {
+  readonly octokit: InstanceType<typeof Client>;
+  constructor(
+    token: string,
+    baseUrl = process.env.GITHUB_API_URL ?? 'https://api.github.com',
+    fetch?: typeof globalThis.fetch,
+  ) {
+    this.octokit = new Client({
+      auth: token || undefined,
+      baseUrl,
+      ...(fetch ? { request: { fetch } } : {}),
+      // Never print Octokit request/error objects: they may contain authorization headers.
+      log: { debug() {}, info() {}, warn() {}, error() {} },
+      throttle: {
+        onRateLimit: (_retryAfter, _options, _octokit, retryCount) =>
+          retryCount < 2,
+        onSecondaryRateLimit: (_retryAfter, _options, _octokit, retryCount) =>
+          retryCount < 2,
+      },
+    });
+  }
+  async getRepo(repo: string): Promise<Repository> {
+    const { data } = await this.octokit.rest.repos.get(repoParts(repo));
+    return { full_name: data.full_name, default_branch: data.default_branch };
+  }
+  async getIssue(repo: string, number: number): Promise<Issue> {
+    return parseIssue(
+      (
+        await this.octokit.rest.issues.get({
+          ...repoParts(repo),
+          issue_number: number,
+        })
+      ).data,
+    );
+  }
+  async listIssueComments(repo: string, number: number): Promise<Comment[]> {
+    return (
+      await this.octokit.paginate(this.octokit.rest.issues.listComments, {
+        ...repoParts(repo),
+        issue_number: number,
+        per_page: 100,
+      })
+    ).map(({ id, body }) => ({ id, body: body ?? '' }));
+  }
+  async createComment(
+    repo: string,
+    number: number,
+    body: string,
+  ): Promise<void> {
+    await this.octokit.rest.issues.createComment({
+      ...repoParts(repo),
+      issue_number: number,
+      body,
+    });
+  }
+  async updateComment(repo: string, id: number, body: string): Promise<void> {
+    const args = { ...repoParts(repo), comment_id: id };
+    if ((await this.octokit.rest.issues.getComment(args)).data.body !== body)
+      await this.octokit.rest.issues.updateComment({ ...args, body });
+  }
+  async addLabels(
+    repo: string,
+    number: number,
+    labels: string[],
+  ): Promise<void> {
+    const existing = await this.getIssue(repo, number);
+    const missing = [...new Set(labels)].filter(
+      (label) => !existing.labels.includes(label),
+    );
+    if (missing.length)
+      await this.octokit.rest.issues.addLabels({
+        ...repoParts(repo),
+        issue_number: number,
+        labels: missing,
+      });
+  }
+  async removeLabel(
+    repo: string,
+    number: number,
+    label: string,
+  ): Promise<void> {
+    if ((await this.getIssue(repo, number)).labels.includes(label))
+      await this.octokit.rest.issues.removeLabel({
+        ...repoParts(repo),
+        issue_number: number,
+        name: label,
+      });
+  }
+  async ensureLabels(
+    repo: string,
+    labels: readonly Label[],
+    dryRun = false,
+  ): Promise<LabelResult[]> {
+    const params = repoParts(repo);
+    const existing = await this.octokit.paginate(
+      this.octokit.rest.issues.listLabelsForRepo,
+      { ...params, per_page: 100 },
+    );
+    const results: LabelResult[] = [];
+    for (const label of labels) {
+      const current = existing.find(
+        (v) => v.name.toLowerCase() === label.name.toLowerCase(),
+      );
+      const status = !current
+        ? 'created'
+        : current.color.toLowerCase() !== label.color.toLowerCase() ||
+            (current.description ?? '') !== label.description
+          ? 'updated'
+          : 'unchanged';
+      results.push({ name: label.name, status });
+      if (!dryRun && status === 'created')
+        await this.octokit.rest.issues.createLabel({ ...params, ...label });
+      if (!dryRun && status === 'updated')
+        await this.octokit.rest.issues.updateLabel({
+          ...params,
+          name: current!.name,
+          new_name: label.name,
+          color: label.color,
+          description: label.description,
+        });
+    }
+    return results;
+  }
+  async getFile(
+    repo: string,
+    path: string,
+    ref: string,
+  ): Promise<string | null> {
+    try {
+      const { data } = await this.octokit.rest.repos.getContent({
+        ...repoParts(repo),
+        path,
+        ref,
+      });
+      if (
+        Array.isArray(data) ||
+        data.type !== 'file' ||
+        data.encoding !== 'base64'
+      )
+        throw new Error('Expected a base64-encoded configuration file');
+      return Buffer.from(data.content, 'base64').toString('utf8');
+    } catch (error) {
+      if (
+        typeof error === 'object' &&
+        error !== null &&
+        'status' in error &&
+        error.status === 404
+      )
+        return null;
+      throw error;
+    }
+  }
+  async getPullRequest(repo: string, number: number): Promise<PullRequest> {
+    return parsePullRequest(
+      (
+        await this.octokit.rest.pulls.get({
+          ...repoParts(repo),
+          pull_number: number,
+        })
+      ).data,
+    );
+  }
+  async listPullRequestsForBranch(
+    repo: string,
+    branch: string,
+  ): Promise<PullRequest[]> {
+    const params = repoParts(repo);
+    return (
+      await this.octokit.paginate(this.octokit.rest.pulls.list, {
+        ...params,
+        state: 'open',
+        head: `${params.owner}:${branch}`,
+        per_page: 100,
+      })
+    ).map(parsePullRequest);
+  }
+  async enablePullRequestAutoMerge(
+    _repo: string,
+    nodeId: string,
+    method: MergeMethod,
+  ): Promise<void> {
+    await this.octokit.graphql(
+      `mutation($id: ID!, $mergeMethod: PullRequestMergeMethod!) {
+      enablePullRequestAutoMerge(input: {pullRequestId: $id, mergeMethod: $mergeMethod}) { pullRequest { id } }
+    }`,
+      { id: nodeId, mergeMethod: method.toUpperCase() },
+    );
+  }
+  async requestReviewers(
+    repo: string,
+    number: number,
+    users: string[],
+    teams: string[],
+  ): Promise<void> {
+    await this.octokit.rest.pulls.requestReviewers({
+      ...repoParts(repo),
+      pull_number: number,
+      reviewers: users,
+      team_reviewers: teams,
+    });
+  }
+  async addReaction(
+    repo: string,
+    commentId: number,
+    content: 'eyes',
+  ): Promise<void> {
+    // GitHub returns the existing reaction when this identity already reacted.
+    await this.octokit.rest.reactions.createForIssueComment({
+      ...repoParts(repo),
+      comment_id: commentId,
+      content,
+    });
+  }
+  async assignCopilot(
+    repo: string,
+    number: number,
+    assignment: Assignment,
+  ): Promise<void> {
+    await this.octokit.request(
+      'POST /repos/{owner}/{repo}/issues/{issue_number}/assignees',
+      { ...repoParts(repo), issue_number: number, ...assignment },
+    );
+  }
+}

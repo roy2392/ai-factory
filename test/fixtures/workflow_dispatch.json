@@ -1,0 +1,6 @@
+{
+  "inputs": {},
+  "ref": "refs/heads/main",
+  "repository": { "full_name": "acme/widget", "default_branch": "main" },
+  "sender": { "login": "maintainer", "type": "User" }
+}

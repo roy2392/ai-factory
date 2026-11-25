@@ -1,0 +1,26 @@
+name: AI Factory
+on:
+  issues:
+    types: [opened, labeled]
+  pull_request_target:
+    types: [opened, ready_for_review, reopened]
+permissions: {}
+jobs:
+  dispatch:
+    if: github.event_name == 'issues'
+    permissions:
+      contents: read
+      issues: write
+    uses: OWNER/ai-factory/.github/workflows/reusable-dispatch.yml@v1
+    with:
+      factory_repo: OWNER/ai-factory
+    secrets: inherit
+  automerge:
+    if: github.event_name == 'pull_request_target'
+    permissions:
+      contents: read
+      pull-requests: write
+    uses: OWNER/ai-factory/.github/workflows/reusable-automerge.yml@v1
+    with:
+      factory_repo: OWNER/ai-factory
+    secrets: inherit

@@ -1,0 +1,12 @@
+node_modules/
+coverage/
+package-lock.json
+AGENTS.md
+README.md
+docs/ARCHITECTURE.md
+docs/CONFIG.md
+docs/SETUP.md
+docs/PLAN.md
+docs/specs/
+skills/
+templates/**/*.md

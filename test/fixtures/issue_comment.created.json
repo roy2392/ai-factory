@@ -1,0 +1,21 @@
+{
+  "action": "created",
+  "issue": {
+    "number": 12,
+    "html_url": "https://github.com/acme/widget/issues/12",
+    "state": "open",
+    "user": { "login": "maintainer", "type": "User" },
+    "author_association": "MEMBER",
+    "body": "Add a health endpoint.",
+    "labels": [{ "name": "ai:in-progress" }],
+    "assignees": [{ "login": "copilot-swe-agent[bot]" }]
+  },
+  "comment": {
+    "id": 42,
+    "body": "/ai ask where is the router?",
+    "user": { "login": "maintainer", "type": "User" },
+    "author_association": "MEMBER"
+  },
+  "repository": { "full_name": "acme/widget", "default_branch": "main" },
+  "sender": { "login": "maintainer", "type": "User" }
+}

@@ -1,0 +1,4 @@
+{
+  "schedule": "*/30 * * * *",
+  "repository": { "full_name": "acme/widget", "default_branch": "main" }
+}

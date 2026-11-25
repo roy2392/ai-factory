@@ -1,0 +1,23 @@
+{
+  "action": "ready_for_review",
+  "number": 13,
+  "pull_request": {
+    "number": 13,
+    "node_id": "PR_kwDOExample",
+    "state": "open",
+    "user": { "login": "copilot-swe-agent[bot]", "type": "Bot" },
+    "body": "Implements the health endpoint.\n\nFixes #12",
+    "draft": false,
+    "head": {
+      "ref": "copilot/add-health",
+      "repo": { "full_name": "acme/widget" }
+    },
+    "base": { "ref": "main", "repo": { "full_name": "acme/widget" } },
+    "auto_merge": null,
+    "labels": [],
+    "requested_reviewers": [],
+    "requested_teams": []
+  },
+  "repository": { "full_name": "acme/widget", "default_branch": "main" },
+  "sender": { "login": "factory-bot", "type": "User" }
+}
