@@ -9,6 +9,8 @@ export interface Actor {
 }
 
 export interface Issue {
+  created_at?: string;
+  closed_at?: string | null;
   id?: number;
   updated_at?: string;
   title?: string;
@@ -24,6 +26,8 @@ export interface Issue {
 }
 
 export interface PullRequest {
+  created_at?: string;
+  closed_at?: string | null;
   updated_at?: string;
   merged_at?: string | null;
   number: number;
@@ -88,6 +92,11 @@ export interface Assignment {
 }
 
 export interface GitHubClient {
+  listPullRequestReviews(repo: string, number: number): Promise<Comment[]>;
+  listPullRequestReviewComments(
+    repo: string,
+    number: number,
+  ): Promise<Comment[]>;
   listSubIssues(repo: string, number: number): Promise<Issue[]>;
   addSubIssue(repo: string, parent: number, childId: number): Promise<void>;
   listBlockedBy(repo: string, number: number): Promise<Issue[]>;

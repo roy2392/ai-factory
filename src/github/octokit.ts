@@ -20,6 +20,42 @@ import {
 
 const Client = Octokit.plugin(retry, throttling);
 export class OctokitGitHubClient implements GitHubClient {
+  async listPullRequestReviews(
+    repo: string,
+    number: number,
+  ): Promise<Comment[]> {
+    return (
+      await this.octokit.paginate(this.octokit.rest.pulls.listReviews, {
+        ...repoParts(repo),
+        pull_number: number,
+        per_page: 100,
+      })
+    )
+      .filter((review) => !!review.submitted_at)
+      .map(({ id, body, user, submitted_at }) => ({
+        id,
+        body: body ?? '',
+        created_at: submitted_at,
+        user: user ? { login: user.login, type: user.type } : null,
+      }));
+  }
+  async listPullRequestReviewComments(
+    repo: string,
+    number: number,
+  ): Promise<Comment[]> {
+    return (
+      await this.octokit.paginate(this.octokit.rest.pulls.listReviewComments, {
+        ...repoParts(repo),
+        pull_number: number,
+        per_page: 100,
+      })
+    ).map(({ id, body, user, created_at }) => ({
+      id,
+      body: body ?? '',
+      created_at,
+      user: user ? { login: user.login, type: user.type } : null,
+    }));
+  }
   // Verified: https://docs.github.com/en/rest/issues/sub-issues#add-sub-issue
   // and https://docs.github.com/en/rest/issues/issue-dependencies#add-a-dependency-an-issue-is-blocked-by
   // URL paths take the issue NUMBER; body sub_issue_id / issue_id take database IDs.

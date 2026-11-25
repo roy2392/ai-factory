@@ -38,6 +38,88 @@ function transport(
 }
 
 describe('Octokit transport (mock fetch, no network)', () => {
+  it('paginates submitted PR reviews and maps submission times, excluding pending reviews', async () => {
+    const { client, calls } = transport([
+      {
+        data: [
+          {
+            id: 1,
+            body: '@copilot fix',
+            user: { login: 'human', type: 'User' },
+            submitted_at: '2026-11-01T00:00:00Z',
+          },
+          { id: 2, body: 'pending', user: null, submitted_at: null },
+        ],
+        headers: {
+          link: '<https://github.example.test/api/v3/page2>; rel="next"',
+        },
+      },
+      {
+        data: [
+          {
+            id: 3,
+            body: null,
+            user: null,
+            submitted_at: '2026-11-02T00:00:00Z',
+          },
+        ],
+      },
+    ]);
+    expect(await client.listPullRequestReviews(repo, 13)).toEqual([
+      {
+        id: 1,
+        body: '@copilot fix',
+        user: { login: 'human', type: 'User' },
+        created_at: '2026-11-01T00:00:00Z',
+      },
+      { id: 3, body: '', user: null, created_at: '2026-11-02T00:00:00Z' },
+    ]);
+    expect(calls[0]?.url).toContain('/pulls/13/reviews');
+    expect(calls).toHaveLength(2);
+  });
+  it('paginates inline review comments and preserves issue/PR lifecycle timestamps', async () => {
+    const { client, calls } = transport([
+      {
+        data: [
+          {
+            id: 1,
+            body: 'inline',
+            user: { login: 'human', type: 'User' },
+            created_at: '2026-11-01T00:00:00Z',
+          },
+        ],
+        headers: {
+          link: '<https://github.example.test/api/v3/page2>; rel="next"',
+        },
+      },
+      { data: [] },
+    ]);
+    expect(
+      (await client.listPullRequestReviewComments(repo, 13))[0]?.created_at,
+    ).toBe('2026-11-01T00:00:00Z');
+    expect(calls[0]?.url).toContain('/pulls/13/comments');
+    expect(calls).toHaveLength(2);
+    const fixture = JSON.parse(
+      readFileSync(
+        new URL(
+          '../fixtures/pull_request_target.ready_for_review.json',
+          import.meta.url,
+        ),
+        'utf8',
+      ),
+    ) as { pull_request: Record<string, unknown> };
+    const dates = {
+      created_at: '2026-11-01T00:00:00Z',
+      closed_at: '2026-11-10T00:00:00Z',
+      merged_at: '2026-11-10T00:00:00Z',
+    };
+    const prClient = transport([
+      { data: [{ ...fixture.pull_request, ...dates }] },
+    ]).client;
+    expect((await prClient.listPullRequests(repo, 'all'))[0]).toMatchObject(
+      dates,
+    );
+  });
   it('uses path numbers and database IDs in sub-issue and dependency request bodies, and skips existing links', async () => {
     const payload = JSON.parse(
       readFileSync(

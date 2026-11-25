@@ -485,3 +485,41 @@ No new runtime dependencies were added.
    scenario producing three gap rounds, complete each round and confirm exactly one
    human-needed escalation and no fourth review. Edit the requirements body and
    confirm a new analysis resets `review_rounds` to zero.
+
+## Metrics
+
+`npm run factory -- metrics --repo OWNER/REPO --since 30d` prints Markdown and
+writes `metrics.json` (or use `--output-dir PATH`). It also appends the table to
+`GITHUB_STEP_SUMMARY` when set. Supply a read-only `APP_TOKEN`, `FACTORY_APP_LOGIN`
+(default `ai-factory[bot]`), and `COPILOT_BOT_LOGIN`; no webhook/config file is
+needed. `--since` accepts positive integer days/hours/weeks; `--dry-run` suppresses
+file/summary writes. Missing bot-user identity is explicitly reported as incomplete
+repair coverage and prevents excluding that account from the human-change signal.
+
+Definitions implemented in `src/metrics.ts`:
+
+- Counts use each opening/merge/closure timestamp in the inclusive UTC window.
+  Merge duration uses the earliest local issue linked by `Fixes`/`Closes`/`Resolves`,
+  one sample per merged Copilot PR. Missing dates/links are omitted; unavailable
+  rates are JSON `null` / Markdown `N/A`.
+- Human-requested changes means a standalone, case-insensitive `@copilot` mention
+  in a conversation comment, inline review comment, or submitted review body from
+  a non-bot User, excluding the configured automation user. All pre-merge feedback
+  counts, including before the window. Reviews without the mention do not count.
+- Self-heal counts trusted App/user receipts within the window, deduplicated by
+  run. Its denominator is PRs with an observed attempt or give-up, including
+  zero-attempt escalations. Requirements use App task markers; fully closed
+  parents need a matching-body completion receipt and an in-window closure.
+
+Optional weekly caller: `templates/target-repo/.github/workflows/metrics.yml`.
+Replace `OWNER` and deploy the reviewed ref. It runs Mondays at 08:00 UTC or
+manually, uses only read-only App permissions, and publishes the job summary and
+JSON artifact. Historical reads paginate; large repositories may exceed the
+15-minute timeout. Deleted feedback and earlier close/reopen transitions cannot
+be reconstructed from current state.
+
+Local checks passed: dependency installation with the temporary cache, lint,
+typecheck, **329 tests in 36 files**, and actionlint. Pure, transport, and whole-CLI
+fake-client tests verify zero GitHub writes. Human smoke test: compare the optional
+workflow's summary/artifact against known GitHub PRs, repairs, and requirements.
+Live metrics were not collected locally.

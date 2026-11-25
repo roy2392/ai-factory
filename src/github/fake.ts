@@ -17,6 +17,8 @@ export interface WriteCall {
   args: unknown[];
 }
 export class FakeState {
+  reviews = new Map<string, Comment[]>();
+  reviewComments = new Map<string, Comment[]>();
   subIssues = new Map<string, number[]>();
   blockedBy = new Map<string, number[]>();
   now = new Date().toISOString();
@@ -34,6 +36,20 @@ export class FakeState {
 }
 
 export class FakeGitHubClient implements GitHubClient {
+  async listPullRequestReviews(
+    repo: string,
+    number: number,
+  ): Promise<Comment[]> {
+    return structuredClone(this.state.reviews.get(`${repo}#${number}`) ?? []);
+  }
+  async listPullRequestReviewComments(
+    repo: string,
+    number: number,
+  ): Promise<Comment[]> {
+    return structuredClone(
+      this.state.reviewComments.get(`${repo}#${number}`) ?? [],
+    );
+  }
   async listSubIssues(repo: string, number: number): Promise<Issue[]> {
     const ids = this.state.subIssues.get(`${repo}#${number}`) ?? [];
     return (await this.listIssues(repo, 'all', [])).filter(
@@ -83,6 +99,8 @@ export class FakeGitHubClient implements GitHubClient {
     const number = Math.max(0, ...all.map((i) => i.number)) + 1;
     const id = Math.max(1000, ...all.map((i) => i.id ?? 0)) + 1;
     const issue: Issue = {
+      created_at: this.state.now,
+      closed_at: null,
       id,
       number,
       title,
@@ -104,6 +122,7 @@ export class FakeGitHubClient implements GitHubClient {
     if (issue.state !== 'closed') {
       this.record('closeIssue', repo, number, 'completed');
       issue.state = 'closed';
+      issue.closed_at = this.state.now;
     }
   }
   async listIssuesByLabel(repo: string, label: string): Promise<Issue[]> {

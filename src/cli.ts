@@ -17,6 +17,7 @@ import { parseMode } from './copilot-cli.js';
 import * as selfHeal from './commands/self-heal.js';
 import * as watchdog from './commands/watchdog.js';
 import * as requirements from './commands/requirements.js';
+import * as metrics from './commands/metrics.js';
 
 function escapeAnnotation(value: string): string {
   return value.replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A');
@@ -59,6 +60,7 @@ export async function main(
         'output-dir': { type: 'string' },
         'input-dir': { type: 'string' },
         issue: { type: 'string' },
+        since: { type: 'string' },
       },
     });
     const command = positionals[0];
@@ -76,13 +78,16 @@ export async function main(
         'watchdog',
         'requirements',
         'requirements-apply',
+        'metrics',
       ].includes(command ?? '')
     )
       throw new Error(
-        'Usage: factory dispatch|automerge|labels|ai-command|build-prompt|post-plan|post-answer|self-heal|watchdog|requirements|requirements-apply [--dry-run] [--repo OWNER/REPO (labels only)] [--mode ask|plan (build-prompt only)] [--issue N (requirements scan)] [--input-dir PATH (requirements-apply)] [--output-dir PATH]',
+        'Usage: factory dispatch|automerge|labels|ai-command|build-prompt|post-plan|post-answer|self-heal|watchdog|requirements|requirements-apply|metrics [--dry-run] [--repo OWNER/REPO (labels/metrics)] [--since 30d (metrics)] [--mode ask|plan (build-prompt only)] [--issue N (requirements scan)] [--input-dir PATH (requirements-apply)] [--output-dir PATH]',
       );
-    if (values.repo && command !== 'labels')
-      throw new Error('--repo is only supported for labels');
+    if (values.repo && command !== 'labels' && command !== 'metrics')
+      throw new Error('--repo is only supported for labels or metrics');
+    if (values.since && command !== 'metrics')
+      throw new Error('--since is only supported for metrics');
     if (values['input-dir'] && command !== 'requirements-apply')
       throw new Error('--input-dir is only supported for requirements-apply');
     if (values.issue && command !== 'requirements')
@@ -108,16 +113,23 @@ export async function main(
         'post-answer',
         'requirements',
         'requirements-apply',
+        'metrics',
       ].includes(command!)
     )
       throw new Error(
         '--output-dir is only supported for prompt/post commands',
       );
     let event: FactoryEvent;
-    if (command === 'labels') {
+    if (command === 'labels' || command === 'metrics') {
       const repo = values.repo ?? '';
       repoParts(repo);
-      event = { name: 'workflow_dispatch', repo, inputs: {} };
+      event = {
+        name: 'workflow_dispatch',
+        repo,
+        inputs: {},
+        factoryLogin: env.FACTORY_APP_LOGIN,
+        botLogin: env.COPILOT_BOT_LOGIN,
+      };
     } else event = readEvent(env);
     const token = command === 'build-prompt' ? env.GITHUB_TOKEN : env.APP_TOKEN;
     if (!values['dry-run'] && !token)
@@ -147,7 +159,11 @@ export async function main(
     }
     let config = DEFAULT_CONFIG;
     // Publication only needs Issues permission; prompt building only uses read credentials.
-    if (!['build-prompt', 'post-plan', 'post-answer'].includes(command!)) {
+    if (
+      !['build-prompt', 'post-plan', 'post-answer', 'metrics'].includes(
+        command!,
+      )
+    ) {
       const repo = await appClient.getRepo(event.repo);
       // Configuration is trusted default-branch data, never content from the PR head.
       config = await loadConfig(appClient, repo, repo.default_branch);
@@ -159,7 +175,14 @@ export async function main(
       config,
       log,
     };
-    if (command === 'requirements') {
+    if (command === 'metrics') {
+      await metrics.run(deps, {
+        since: values.since,
+        outputDir: values['output-dir'],
+        summaryPath: env.GITHUB_STEP_SUMMARY,
+        dryRun: values['dry-run'],
+      });
+    } else if (command === 'requirements') {
       const plan = (
         await requirements.scan(
           deps,

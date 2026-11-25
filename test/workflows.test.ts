@@ -29,6 +29,48 @@ interface Workflow {
 const workflow = (name: string) =>
   parse(readFileSync(`.github/workflows/${name}.yml`, 'utf8')) as Workflow;
 
+it('collects optional weekly metrics with read-only App permissions and no user/CLI token', () => {
+  const file = workflow('reusable-metrics'),
+    job = file.jobs.metrics!;
+  expect(file.permissions).toEqual({});
+  expect(file.concurrency?.['cancel-in-progress']).toBe(false);
+  expect(job['timeout-minutes']).toBe(15);
+  expect(job.permissions).toEqual({ issues: 'read', 'pull-requests': 'read' });
+  const token = job.steps!.find((s) =>
+    s.uses?.startsWith('actions/create-github-app-token'),
+  )!;
+  expect(
+    Object.entries(token.with!).filter(([k]) => k.startsWith('permission-')),
+  ).toEqual([
+    ['permission-contents', 'read'],
+    ['permission-pull-requests', 'read'],
+    ['permission-issues', 'read'],
+  ]);
+  expect(JSON.stringify(file)).not.toMatch(
+    /USER_TOKEN|COPILOT_CLI_TOKEN|COPILOT_ASSIGN_TOKEN/,
+  );
+  const checkout = job.steps!.find((s) =>
+    s.uses?.startsWith('actions/checkout'),
+  )!;
+  expect(checkout.with).toMatchObject({
+    repository: '${{ inputs.factory_repo }}',
+    ref: '${{ inputs.factory_ref }}',
+    'persist-credentials': false,
+  });
+  expect(
+    job.steps!.find((s) => s.uses?.startsWith('actions/upload-artifact'))?.with
+      ?.path,
+  ).toBe('.factory/out/metrics.json');
+  const caller = parse(
+    readFileSync('templates/target-repo/.github/workflows/metrics.yml', 'utf8'),
+  ) as Workflow & { on: { schedule: { cron: string }[] } };
+  expect(caller.on.schedule).toEqual([{ cron: '0 8 * * 1' }]);
+  expect(caller.jobs.metrics?.permissions).toEqual({
+    issues: 'read',
+    'pull-requests': 'read',
+  });
+});
+
 describe('Phase 4 workflow isolation', () => {
   it('holds a per-requirements lock across think/apply and limits the fanout to two', () => {
     const scan = workflow('reusable-requirements');
