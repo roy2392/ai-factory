@@ -43,7 +43,7 @@ jobs:
           fi
           echo "factory=${FACTORY_REPO#*/}" >> "$GITHUB_OUTPUT"
           echo "target=${GITHUB_REPOSITORY#*/}" >> "$GITHUB_OUTPUT"
-      - uses: actions/create-github-app-token@v2
+      - uses: actions/create-github-app-token@v3
         id: app
         with:
           app-id: ${{ secrets.FACTORY_APP_ID }}
@@ -55,14 +55,14 @@ jobs:
           permission-contents: read
           permission-issues: read
           permission-pull-requests: read
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           repository: ${{ inputs.factory_repo }}
           ref: ${{ inputs.factory_ref }}
           path: .factory
           token: ${{ steps.app.outputs.token }}
           persist-credentials: false
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '24'
       - run: npm ci
@@ -74,7 +74,7 @@ jobs:
         env:
           APP_TOKEN: ${{ steps.app.outputs.token }}
           FACTORY_APP_LOGIN: ${{ steps.app.outputs.app-slug }}[bot]
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: steps.scan.outputs.plan != '[]'
         with:
           name: requirements-source-${{ github.run_id }}
@@ -87,7 +87,7 @@ jobs:
           overwrite: true
           retention-days: 1
           if-no-files-found: error
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: steps.scan.outputs.plan != '[]'
         with:
           name: requirements-inputs-${{ github.run_id }}

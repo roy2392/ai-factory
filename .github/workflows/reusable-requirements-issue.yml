@@ -29,20 +29,20 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ github.event.repository.default_branch }}
           path: target
           persist-credentials: false
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: requirements-source-${{ github.run_id }}
           path: .factory
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: requirements-inputs-${{ github.run_id }}
           path: .requirements-inputs
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '24'
       - run: npm ci
@@ -59,7 +59,7 @@ jobs:
         run: ../.factory/node_modules/.bin/tsx ../.factory/src/run-copilot.ts
         env:
           COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_CLI_TOKEN }}
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: requirements-output-${{ github.run_id }}-${{ inputs.issue }}
           path: target/out/issues.json
@@ -74,26 +74,26 @@ jobs:
     permissions:
       issues: write
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: requirements-source-${{ github.run_id }}
           path: .factory
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: requirements-inputs-${{ github.run_id }}
           path: .requirements-inputs
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         if: needs.think.result == 'success'
         continue-on-error: true
         with:
           name: requirements-output-${{ github.run_id }}-${{ inputs.issue }}
           path: .model-output
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '24'
       - run: npm ci
         working-directory: .factory
-      - uses: actions/create-github-app-token@v2
+      - uses: actions/create-github-app-token@v3
         id: app
         with:
           app-id: ${{ secrets.FACTORY_APP_ID }}

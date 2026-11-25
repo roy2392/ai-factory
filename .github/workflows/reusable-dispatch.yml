@@ -45,7 +45,7 @@ jobs:
           fi
           echo "factory=${FACTORY_REPO#*/}" >> "$GITHUB_OUTPUT"
           echo "target=${GITHUB_REPOSITORY#*/}" >> "$GITHUB_OUTPUT"
-      - uses: actions/create-github-app-token@v2
+      - uses: actions/create-github-app-token@v3
         id: app
         with:
           app-id: ${{ secrets.FACTORY_APP_ID }}
@@ -56,14 +56,14 @@ jobs:
             ${{ steps.repos.outputs.factory }}
           permission-contents: read
           permission-issues: write
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           repository: ${{ inputs.factory_repo }}
           ref: ${{ inputs.factory_ref }}
           path: .factory
           token: ${{ steps.app.outputs.token }}
           persist-credentials: false
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '24'
           cache: npm
@@ -79,7 +79,7 @@ jobs:
           USER_TOKEN: ${{ secrets.COPILOT_ASSIGN_TOKEN }}
       - name: Share trusted factory source (no credentials or dependencies)
         if: steps.route.outputs.mode == 'plan' || steps.route.outputs.mode == 'ask'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: factory-source-${{ github.run_id }}
           include-hidden-files: true

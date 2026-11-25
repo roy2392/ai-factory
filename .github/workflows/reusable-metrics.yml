@@ -40,7 +40,7 @@ jobs:
           fi
           echo "factory=${FACTORY_REPO#*/}" >> "$GITHUB_OUTPUT"
           echo "target=${GITHUB_REPOSITORY#*/}" >> "$GITHUB_OUTPUT"
-      - uses: actions/create-github-app-token@v2
+      - uses: actions/create-github-app-token@v3
         id: app
         with:
           app-id: ${{ secrets.FACTORY_APP_ID }}
@@ -52,14 +52,14 @@ jobs:
           permission-contents: read
           permission-pull-requests: read
           permission-issues: read
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           repository: ${{ inputs.factory_repo }}
           ref: ${{ inputs.factory_ref }}
           path: .factory
           token: ${{ steps.app.outputs.token }}
           persist-credentials: false
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '24'
           cache: npm
@@ -74,7 +74,7 @@ jobs:
           COPILOT_BOT_LOGIN: ${{ vars.COPILOT_BOT_LOGIN }}
           REPO: ${{ github.repository }}
           SINCE: ${{ inputs.since }}
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: factory-metrics-${{ github.run_id }}
           path: .factory/out/metrics.json

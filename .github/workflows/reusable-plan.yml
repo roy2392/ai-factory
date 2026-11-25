@@ -30,17 +30,17 @@ jobs:
       issues: read # Only build-prompt receives this GITHUB_TOKEN.
     steps:
       - name: Checkout the target default branch
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: ${{ github.event.repository.default_branch }}
           path: target
           persist-credentials: false
       - name: Download trusted factory source from route
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: ${{ inputs.factory_artifact }}
           path: .factory
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '24'
           cache: npm
@@ -65,7 +65,7 @@ jobs:
           COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_CLI_TOKEN }}
       - name: Upload generated Markdown only
         if: success()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: copilot-output-${{ github.run_id }}
           path: |
@@ -82,11 +82,11 @@ jobs:
     permissions:
       issues: write
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: ${{ inputs.factory_artifact }}
           path: .factory
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: '24'
           cache: npm
@@ -96,11 +96,11 @@ jobs:
       - name: Download model output if it exists
         if: needs.think.result == 'success'
         continue-on-error: true # Missing output must still produce the failure comment.
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: copilot-output-${{ github.run_id }}
           path: .model-output
-      - uses: actions/create-github-app-token@v2
+      - uses: actions/create-github-app-token@v3
         id: app
         with:
           app-id: ${{ secrets.FACTORY_APP_ID }}

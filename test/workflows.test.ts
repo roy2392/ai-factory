@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { parse } from 'yaml';
 import { COPILOT_CLI_VERSION } from '../src/copilot-cli.js';
@@ -28,6 +28,50 @@ interface Workflow {
 }
 const workflow = (name: string) =>
   parse(readFileSync(`.github/workflows/${name}.yml`, 'utf8')) as Workflow;
+
+// Verified against each action's latest release and major-tag action.yml
+// (runs.using: node24) on 2026-11-25. Keep template alternatives in sync too.
+const node24Actions: Record<string, string> = {
+  'actions/checkout': 'v7',
+  'actions/setup-node': 'v7',
+  'actions/upload-artifact': 'v7',
+  'actions/download-artifact': 'v8',
+  'actions/create-github-app-token': 'v3',
+  'actions/setup-java': 'v6',
+  'actions/setup-python': 'v7',
+};
+
+describe('workflow action versions', () => {
+  const files = [
+    '.github/workflows',
+    'templates/target-repo/.github/workflows',
+  ].flatMap((directory) =>
+    readdirSync(directory)
+      .filter((name) => /\.ya?ml$/.test(name))
+      .map((name) => `${directory}/${name}`),
+  );
+
+  it.each(files)(
+    'uses verified Node 24 majors or pinned third-party actions in %s',
+    (file) => {
+      const source = readFileSync(file, 'utf8');
+      // Include commented setup alternatives; reusable workflow refs are not actions.
+      for (const match of source.matchAll(
+        /^\s*(?:#\s*)?(?:-\s*)?uses:\s+([^@\s]+)@([^\s]+)(.*)$/gm,
+      )) {
+        const [, action, version, comment] = match;
+        if (action!.includes('/.github/workflows/')) continue;
+        if (/^(actions|github)\//.test(action!)) {
+          expect(node24Actions, action).toHaveProperty(action!);
+          expect(version, `${file}: ${action}`).toBe(node24Actions[action!]);
+        } else {
+          expect(version, `${file}: ${action}`).toMatch(/^[a-f0-9]{40}$/);
+          expect(comment, `${file}: ${action}`).toMatch(/^\s+#\s+v\d/);
+        }
+      }
+    },
+  );
+});
 
 it('collects optional weekly metrics with read-only App permissions and no user/CLI token', () => {
   const file = workflow('reusable-metrics'),
