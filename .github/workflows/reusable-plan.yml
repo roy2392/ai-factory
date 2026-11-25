@@ -1,0 +1,122 @@
+name: Factory plan or answer
+on:
+  workflow_call:
+    inputs:
+      mode:
+        type: string
+        required: true
+      factory_artifact:
+        type: string
+        required: true
+    secrets:
+      FACTORY_APP_ID:
+        required: true
+      FACTORY_APP_PRIVATE_KEY:
+        required: true
+      COPILOT_CLI_TOKEN:
+        required: true
+permissions: {}
+# The caller holds ai-factory-issue-N across route/think/publish. Reusing that
+# same lock here would deadlock the nested workflow against its caller.
+concurrency:
+  group: ai-factory-plan-issue-${{ github.event.issue.number }}
+  cancel-in-progress: false
+jobs:
+  think:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      issues: read # Only build-prompt receives this GITHUB_TOKEN.
+    steps:
+      - name: Checkout the target default branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          path: target
+          persist-credentials: false
+      - name: Download trusted factory source from route
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.factory_artifact }}
+          path: .factory
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: .factory/package-lock.json
+      - run: npm ci
+        working-directory: .factory
+      - name: Build prompt with a step-scoped read token
+        working-directory: target
+        run: ../.factory/node_modules/.bin/tsx ../.factory/src/cli.ts build-prompt --mode "$MODE"
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          MODE: ${{ inputs.mode }}
+      - name: Install and inspect the pinned Copilot CLI
+        run: |
+          npm install --global @github/copilot@1.0.112
+          copilot --no-auto-update --version
+          copilot --no-auto-update --help
+      - name: Run Copilot without GitHub API credentials
+        working-directory: target
+        run: ../.factory/node_modules/.bin/tsx ../.factory/src/run-copilot.ts
+        env:
+          COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_CLI_TOKEN }}
+      - name: Upload generated Markdown only
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: copilot-output-${{ github.run_id }}
+          path: |
+            target/out/plan.md
+            target/out/answer.md
+          overwrite: true # Stable names support rerun-failed-jobs across run attempts.
+          retention-days: 1
+          if-no-files-found: error
+  publish:
+    needs: think
+    if: ${{ always() && !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      issues: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.factory_artifact }}
+          path: .factory
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: .factory/package-lock.json
+      - run: npm ci
+        working-directory: .factory
+      - name: Download model output if it exists
+        if: needs.think.result == 'success'
+        continue-on-error: true # Missing output must still produce the failure comment.
+        uses: actions/download-artifact@v4
+        with:
+          name: copilot-output-${{ github.run_id }}
+          path: .model-output
+      - uses: actions/create-github-app-token@v2
+        id: app
+        with:
+          app-id: ${{ secrets.FACTORY_APP_ID }}
+          private-key: ${{ secrets.FACTORY_APP_PRIVATE_KEY }}
+          permission-issues: write
+      - name: Publish validated output or report failure
+        working-directory: .factory
+        env:
+          APP_TOKEN: ${{ steps.app.outputs.token }}
+          FACTORY_APP_LOGIN: ${{ steps.app.outputs.app-slug }}[bot]
+          MODE: ${{ inputs.mode }}
+        shell: bash
+        run: |
+          case "$MODE" in
+            plan) command=post-plan ;;
+            ask) command=post-answer ;;
+            *) echo '::error::Invalid mode'; exit 1 ;;
+          esac
+          npx --no-install tsx src/cli.ts "$command" --output-dir ../.model-output

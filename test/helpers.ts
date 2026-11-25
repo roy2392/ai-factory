@@ -40,11 +40,13 @@ export function fixtureEnv(name = 'issues'): NodeJS.ProcessEnv {
     COPILOT_BOT_LOGIN: 'factory-bot',
   };
 }
-export function setup(name: 'issues' | 'pull_request_target' = 'issues') {
+export function setup(
+  name: 'issues' | 'pull_request_target' | 'issue_comment' = 'issues',
+) {
   const event = readEvent(fixtureEnv(name));
   const state = new FakeState();
   state.repositories.set(repo, { full_name: repo, default_branch: 'main' });
-  if (event.name === 'issues')
+  if (event.name === 'issues' || event.name === 'issue_comment')
     state.issues.set(`${repo}#12`, structuredClone(event.issue));
   if (event.name === 'pull_request_target')
     state.pullRequests.set(`${repo}#13`, structuredClone(event.pullRequest));

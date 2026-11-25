@@ -5,6 +5,7 @@ import { repoParts, type Issue, type PullRequest } from './github/client.js';
 const actor = z.object({ login: z.string().min(1), type: z.string() });
 const label = z.union([z.string(), z.object({ name: z.string() })]);
 const issueSchema = z.object({
+  title: z.string().optional(),
   number: z.number().int().positive(),
   html_url: z.string(),
   state: z.enum(['open', 'closed']),
@@ -54,6 +55,9 @@ export function parsePullRequest(value: unknown): PullRequest {
 interface BaseEvent {
   repo: string;
   botLogin?: string;
+  factoryLogin?: string;
+  runId?: string;
+  runUrl?: string;
 }
 export type FactoryEvent = BaseEvent &
   (
@@ -65,6 +69,7 @@ export type FactoryEvent = BaseEvent &
         comment: {
           id: number;
           body: string;
+          html_url?: string;
           user: z.infer<typeof actor>;
           author_association: string;
         };
@@ -106,6 +111,11 @@ export function readEvent(env: NodeJS.ProcessEnv = process.env): FactoryEvent {
   const base = {
     repo,
     ...(env.COPILOT_BOT_LOGIN ? { botLogin: env.COPILOT_BOT_LOGIN } : {}),
+    factoryLogin: env.FACTORY_APP_LOGIN ?? 'ai-factory[bot]',
+    runId: env.GITHUB_RUN_ID,
+    runUrl: env.GITHUB_RUN_ID
+      ? `${env.GITHUB_SERVER_URL ?? 'https://github.com'}/${repo}/actions/runs/${env.GITHUB_RUN_ID}`
+      : undefined,
   };
   switch (name) {
     case 'issues':
@@ -127,8 +137,9 @@ export function readEvent(env: NodeJS.ProcessEnv = process.env): FactoryEvent {
         issue: parseIssue(payload.issue),
         comment: z
           .object({
-            id: z.number(),
+            id: z.number().int().positive(),
             body: z.string(),
+            html_url: z.string().optional(),
             user: actor,
             author_association: z.string(),
           })

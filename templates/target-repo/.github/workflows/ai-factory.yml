@@ -2,10 +2,21 @@ name: AI Factory
 on:
   issues:
     types: [opened, labeled]
+  issue_comment:
+    types: [created]
   pull_request_target:
     types: [opened, ready_for_review, reopened]
 permissions: {}
 jobs:
+  ai-command:
+    if: github.event_name == 'issue_comment'
+    permissions:
+      contents: read
+      issues: write
+    uses: OWNER/ai-factory/.github/workflows/reusable-ai-command.yml@v1
+    with:
+      factory_repo: OWNER/ai-factory
+    secrets: inherit
   dispatch:
     if: github.event_name == 'issues'
     permissions:

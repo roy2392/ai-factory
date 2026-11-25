@@ -9,6 +9,7 @@ export interface Actor {
 }
 
 export interface Issue {
+  title?: string;
   number: number;
   html_url: string;
   state: 'open' | 'closed';
@@ -38,6 +39,7 @@ export interface PullRequest {
 export interface Comment {
   id: number;
   body: string;
+  user?: Actor | null;
 }
 export interface Label {
   name: string;
@@ -95,6 +97,11 @@ export interface GitHubClient {
     repo: string,
     number: number,
     assignment: Assignment,
+  ): Promise<void>;
+  removeAssignees(
+    repo: string,
+    number: number,
+    assignees: string[],
   ): Promise<void>;
 }
 

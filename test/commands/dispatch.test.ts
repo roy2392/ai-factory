@@ -30,15 +30,19 @@ describe('dispatch command', () => {
     expect(state.writes).toEqual([]);
     expect(logs).toContain('::notice::already-dispatched');
   });
-  it('posts the phase 1 gated placeholder only once without assignment or labels', async () => {
+  it('routes the plan gate without writes and stops once that request has a published plan', async () => {
     const { deps, state } = setup();
     state.issues.get(`${repo}#12`)!.labels = ['ai:needs-plan'];
-    await run(deps);
-    await run(deps);
-    expect(state.writes.map((call) => call.method)).toEqual(['createComment']);
-    expect(state.comments.get(`${repo}#12`)?.[0]?.body).toBe(
-      `**Plan gate:** waiting for phase 2\n\n${marker('dispatch', { state: 'gated' })}`,
-    );
+    expect(await run(deps)).toEqual({ mode: 'plan', issue: 12, comment_id: 0 });
+    expect(state.writes).toHaveLength(0);
+    state.comments.set(`${repo}#12`, [
+      {
+        id: 1,
+        body: marker('plan', { source: 'issue-12' }),
+        user: { login: 'ai-factory[bot]', type: 'Bot' },
+      },
+    ]);
+    expect((await run(deps)).mode).toBe('done');
   });
   it.each(skipCases)('writes nothing for %s', async (reason, patch) => {
     const { deps, state, logs } = setup();
@@ -57,8 +61,8 @@ describe('dispatch command', () => {
     deps.event.label = 'design';
     deps.config.labels.needs_plan = 'design';
     state.issues.get(`${repo}#12`)!.labels = ['design'];
-    await run(deps);
-    expect(state.writes.map((call) => call.method)).toEqual(['createComment']);
+    expect((await run(deps)).mode).toBe('plan');
+    expect(state.writes).toHaveLength(0);
   });
   it('skips unsupported events/actions and keeps preexisting labels', async () => {
     const { deps, state } = setup();

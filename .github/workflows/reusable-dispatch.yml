@@ -15,6 +15,8 @@ on:
         required: true
       COPILOT_ASSIGN_TOKEN:
         required: true
+      COPILOT_CLI_TOKEN:
+        required: true
 permissions: {}
 concurrency:
   group: ai-factory-issue-${{ github.event.issue.number }}
@@ -22,7 +24,11 @@ concurrency:
 jobs:
   dispatch:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 5
+    outputs:
+      mode: ${{ steps.route.outputs.mode }}
+      issue: ${{ steps.route.outputs.issue }}
+      comment_id: ${{ steps.route.outputs.comment_id }}
     permissions:
       contents: read
       issues: write
@@ -64,8 +70,37 @@ jobs:
           cache-dependency-path: .factory/package-lock.json
       - run: npm ci
         working-directory: .factory
-      - run: npx --no-install tsx src/cli.ts dispatch
+      - id: route
+        run: npx --no-install tsx src/cli.ts dispatch
         working-directory: .factory
         env:
+          FACTORY_APP_LOGIN: ${{ steps.app.outputs.app-slug }}[bot]
           APP_TOKEN: ${{ steps.app.outputs.token }}
           USER_TOKEN: ${{ secrets.COPILOT_ASSIGN_TOKEN }}
+      - name: Share trusted factory source (no credentials or dependencies)
+        if: steps.route.outputs.mode == 'plan' || steps.route.outputs.mode == 'ask'
+        uses: actions/upload-artifact@v4
+        with:
+          name: factory-source-${{ github.run_id }}
+          include-hidden-files: true
+          path: |
+            .factory/src/
+            .factory/package.json
+            .factory/package-lock.json
+          overwrite: true # Stable names support rerun-failed-jobs across run attempts.
+          retention-days: 1
+          if-no-files-found: error
+  plan:
+    needs: dispatch
+    if: needs.dispatch.outputs.mode == 'plan'
+    permissions:
+      contents: read
+      issues: write
+    uses: ./.github/workflows/reusable-plan.yml
+    with:
+      mode: ${{ needs.dispatch.outputs.mode }}
+      factory_artifact: factory-source-${{ github.run_id }}
+    secrets:
+      FACTORY_APP_ID: ${{ secrets.FACTORY_APP_ID }}
+      FACTORY_APP_PRIVATE_KEY: ${{ secrets.FACTORY_APP_PRIVATE_KEY }}
+      COPILOT_CLI_TOKEN: ${{ secrets.COPILOT_CLI_TOKEN }}

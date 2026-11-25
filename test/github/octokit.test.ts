@@ -31,6 +31,45 @@ function transport(
 }
 
 describe('Octokit transport (mock fetch, no network)', () => {
+  it('removes only requested current assignees using DELETE, preserving human assignments', async () => {
+    const payload = JSON.parse(
+      readFileSync(
+        new URL('../fixtures/issues.opened.json', import.meta.url),
+        'utf8',
+      ),
+    ) as { issue: Record<string, unknown> };
+    payload.issue.assignees = [{ login: 'Copilot' }, { login: 'human' }];
+    const { client, calls } = transport([
+      { data: payload.issue },
+      { data: {} },
+    ]);
+    await client.removeAssignees(repo, 12, [
+      'Copilot',
+      'copilot-swe-agent[bot]',
+    ]);
+    expect(calls[1]?.init?.method).toBe('DELETE');
+    expect(calls[1]?.url).toContain('/issues/12/assignees');
+    expect(JSON.parse(String(calls[1]?.init?.body))).toEqual({
+      assignees: ['Copilot'],
+    });
+  });
+  it('retains comment author identity for trusted plan/state selection', async () => {
+    const { client } = transport([
+      {
+        data: [
+          {
+            id: 1,
+            body: '<!-- ai-factory:plan -->',
+            user: { login: 'ai-factory[bot]', type: 'Bot' },
+          },
+        ],
+      },
+    ]);
+    expect((await client.listIssueComments(repo, 12))[0]?.user).toEqual({
+      login: 'ai-factory[bot]',
+      type: 'Bot',
+    });
+  });
   it('sends Copilot assignment to the assignees endpoint with the full agent payload', async () => {
     const { client, calls } = transport([{ data: {} }]);
     const assignment = {

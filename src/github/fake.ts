@@ -61,7 +61,15 @@ export class FakeGitHubClient implements GitHubClient {
     const key = `${repo}#${number}`;
     this.state.comments.set(key, [
       ...(this.state.comments.get(key) ?? []),
-      { id: this.state.writes.length, body },
+      {
+        id:
+          Math.max(
+            0,
+            ...[...this.state.comments.values()].flat().map((c) => c.id),
+          ) + 1,
+        body,
+        user: { login: 'ai-factory[bot]', type: 'Bot' },
+      },
     ]);
   }
   async updateComment(repo: string, id: number, body: string): Promise<void> {
@@ -208,5 +216,27 @@ export class FakeGitHubClient implements GitHubClient {
     if (!issue) throw new Error('Fake issue not found');
     this.record('assignCopilot', repo, number, assignment);
     issue.assignees.push(...assignment.assignees.map((login) => ({ login })));
+  }
+  async removeAssignees(
+    repo: string,
+    number: number,
+    assignees: string[],
+  ): Promise<void> {
+    const issue = this.state.issues.get(`${repo}#${number}`);
+    if (!issue) throw new Error('Fake issue not found');
+    const removed = issue.assignees.filter(({ login }) =>
+      assignees.includes(login),
+    );
+    if (removed.length) {
+      this.record(
+        'removeAssignees',
+        repo,
+        number,
+        removed.map(({ login }) => login),
+      );
+      issue.assignees = issue.assignees.filter(
+        ({ login }) => !assignees.includes(login),
+      );
+    }
   }
 }

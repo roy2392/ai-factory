@@ -1,0 +1,107 @@
+name: Factory AI commands
+on:
+  workflow_call:
+    inputs:
+      factory_repo:
+        type: string
+        required: true
+      factory_ref:
+        type: string
+        default: v1
+    secrets:
+      FACTORY_APP_ID:
+        required: true
+      FACTORY_APP_PRIVATE_KEY:
+        required: true
+      COPILOT_ASSIGN_TOKEN:
+        required: true
+      COPILOT_CLI_TOKEN:
+        required: true
+permissions: {}
+concurrency:
+  group: ai-factory-issue-${{ github.event.issue.number }}
+  cancel-in-progress: false
+jobs:
+  route:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      mode: ${{ steps.route.outputs.mode }}
+      issue: ${{ steps.route.outputs.issue }}
+      comment_id: ${{ steps.route.outputs.comment_id }}
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: Resolve repositories
+        id: repos
+        env:
+          FACTORY_REPO: ${{ inputs.factory_repo }}
+        shell: bash
+        run: |
+          if [[ "$FACTORY_REPO" != "$GITHUB_REPOSITORY_OWNER/"* ]]; then
+            echo '::error::The factory and target repositories must share an owner for one installation token.'
+            exit 1
+          fi
+          echo "factory=${FACTORY_REPO#*/}" >> "$GITHUB_OUTPUT"
+          echo "target=${GITHUB_REPOSITORY#*/}" >> "$GITHUB_OUTPUT"
+      - uses: actions/create-github-app-token@v2
+        id: app
+        with:
+          app-id: ${{ secrets.FACTORY_APP_ID }}
+          private-key: ${{ secrets.FACTORY_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: |
+            ${{ steps.repos.outputs.target }}
+            ${{ steps.repos.outputs.factory }}
+          permission-contents: read
+          permission-issues: write
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ inputs.factory_repo }}
+          ref: ${{ inputs.factory_ref }}
+          path: .factory
+          token: ${{ steps.app.outputs.token }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: .factory/package-lock.json
+      - run: npm ci
+        working-directory: .factory
+      - id: route
+        run: npx --no-install tsx src/cli.ts ai-command
+        working-directory: .factory
+        env:
+          COPILOT_BOT_LOGIN: ${{ vars.COPILOT_BOT_LOGIN }}
+          FACTORY_APP_LOGIN: ${{ steps.app.outputs.app-slug }}[bot]
+          APP_TOKEN: ${{ steps.app.outputs.token }}
+          USER_TOKEN: ${{ secrets.COPILOT_ASSIGN_TOKEN }}
+      - name: Share trusted factory source (no credentials or dependencies)
+        if: steps.route.outputs.mode == 'plan' || steps.route.outputs.mode == 'ask'
+        uses: actions/upload-artifact@v4
+        with:
+          name: factory-source-${{ github.run_id }}
+          include-hidden-files: true
+          path: |
+            .factory/src/
+            .factory/package.json
+            .factory/package-lock.json
+          overwrite: true # Stable names support rerun-failed-jobs across run attempts.
+          retention-days: 1
+          if-no-files-found: error
+  plan:
+    needs: route
+    if: needs.route.outputs.mode == 'plan' || needs.route.outputs.mode == 'ask'
+    permissions:
+      contents: read
+      issues: write
+    uses: ./.github/workflows/reusable-plan.yml
+    with:
+      mode: ${{ needs.route.outputs.mode }}
+      factory_artifact: factory-source-${{ github.run_id }}
+    secrets:
+      FACTORY_APP_ID: ${{ secrets.FACTORY_APP_ID }}
+      FACTORY_APP_PRIVATE_KEY: ${{ secrets.FACTORY_APP_PRIVATE_KEY }}
+      COPILOT_CLI_TOKEN: ${{ secrets.COPILOT_CLI_TOKEN }}

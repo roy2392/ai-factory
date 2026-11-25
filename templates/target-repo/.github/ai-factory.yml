@@ -7,7 +7,7 @@ allowed_associations: [OWNER, MEMBER, COLLABORATOR] # Trusted issue authors.
 labels:
   skip: [ai:manual, requirements] # Never dispatch these issues.
   needs_plan: ai:needs-plan # Label that activates the plan gate.
-plan_gate: label # label | always | never; Phase 1 only posts a waiting comment.
+plan_gate: label # label | always | never; prepare a plan before implementation.
 agents:
   implementer: implementer # Empty means the default Copilot agent.
   review_triage: review-triage # Used by later phases.

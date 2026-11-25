@@ -9,6 +9,7 @@ const writes = new Set<keyof GitHubClient>([
   'requestReviewers',
   'addReaction',
   'assignCopilot',
+  'removeAssignees',
 ]);
 
 export function dryRunClient(

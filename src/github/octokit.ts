@@ -58,7 +58,11 @@ export class OctokitGitHubClient implements GitHubClient {
         issue_number: number,
         per_page: 100,
       })
-    ).map(({ id, body }) => ({ id, body: body ?? '' }));
+    ).map(({ id, body, user }) => ({
+      id,
+      body: body ?? '',
+      user: user ? { login: user.login, type: user.type } : null,
+    }));
   }
   async createComment(
     repo: string,
@@ -238,5 +242,21 @@ export class OctokitGitHubClient implements GitHubClient {
       'POST /repos/{owner}/{repo}/issues/{issue_number}/assignees',
       { ...repoParts(repo), issue_number: number, ...assignment },
     );
+  }
+  async removeAssignees(
+    repo: string,
+    number: number,
+    assignees: string[],
+  ): Promise<void> {
+    const issue = await this.getIssue(repo, number);
+    const current = issue.assignees
+      .filter(({ login }) => assignees.includes(login))
+      .map(({ login }) => login);
+    if (current.length)
+      await this.octokit.rest.issues.removeAssignees({
+        ...repoParts(repo),
+        issue_number: number,
+        assignees: current,
+      });
   }
 }

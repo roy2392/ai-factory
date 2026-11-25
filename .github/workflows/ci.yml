@@ -19,6 +19,11 @@ jobs:
       - run: npm run lint
       - run: npm run typecheck
       - run: npm test
+      - name: Verify the pinned Copilot CLI flags
+        run: |
+          npx --yes @github/copilot@1.0.112 --no-auto-update --version
+          npx --yes @github/copilot@1.0.112 --no-auto-update --help
+          npx --yes @github/copilot@1.0.112 --no-auto-update help permissions
       - name: Lint workflows and templates
         shell: bash
         run: |

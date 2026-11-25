@@ -1,7 +1,8 @@
 import { pathToFileURL } from 'node:url';
 import { parseArgs } from 'node:util';
+import { appendFileSync } from 'node:fs';
 import { z } from 'zod';
-import { loadConfig } from './config.js';
+import { DEFAULT_CONFIG, loadConfig } from './config.js';
 import { readEvent, type FactoryEvent } from './context.js';
 import { repoParts, type GitHubClient } from './github/client.js';
 import { dryRunClient } from './github/dry-run.js';
@@ -9,6 +10,10 @@ import { OctokitGitHubClient } from './github/octokit.js';
 import * as dispatch from './commands/dispatch.js';
 import * as automerge from './commands/automerge.js';
 import * as labels from './commands/labels.js';
+import * as aiCommand from './commands/ai-command.js';
+import * as buildPrompt from './commands/build-prompt.js';
+import * as post from './commands/post.js';
+import { parseMode } from './copilot-cli.js';
 
 function escapeAnnotation(value: string): string {
   return value.replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A');
@@ -23,7 +28,7 @@ export async function main(
     url,
   ) => new OctokitGitHubClient(token, url),
 ): Promise<number> {
-  const secrets = [env.APP_TOKEN, env.USER_TOKEN].filter(
+  const secrets = [env.APP_TOKEN, env.USER_TOKEN, env.GITHUB_TOKEN].filter(
     (v): v is string => !!v,
   );
   const log = (message: string) => {
@@ -47,51 +52,102 @@ export async function main(
       options: {
         'dry-run': { type: 'boolean', default: false },
         repo: { type: 'string' },
+        mode: { type: 'string' },
+        'output-dir': { type: 'string' },
       },
     });
     const command = positionals[0];
     if (
       positionals.length !== 1 ||
-      !['dispatch', 'automerge', 'labels'].includes(command ?? '')
+      ![
+        'dispatch',
+        'automerge',
+        'labels',
+        'ai-command',
+        'build-prompt',
+        'post-plan',
+        'post-answer',
+      ].includes(command ?? '')
     )
       throw new Error(
-        'Usage: factory dispatch|automerge|labels [--dry-run] [--repo OWNER/REPO (labels only)]',
+        'Usage: factory dispatch|automerge|labels|ai-command|build-prompt|post-plan|post-answer [--dry-run] [--repo OWNER/REPO (labels only)] [--mode ask|plan (build-prompt only)] [--output-dir PATH (prompt/post only)]',
       );
     if (values.repo && command !== 'labels')
       throw new Error('--repo is only supported for labels');
+    if (values.mode && command !== 'build-prompt')
+      throw new Error('--mode is only supported for build-prompt');
+    if (
+      values['output-dir'] &&
+      !['build-prompt', 'post-plan', 'post-answer'].includes(command!)
+    )
+      throw new Error(
+        '--output-dir is only supported for prompt/post commands',
+      );
     let event: FactoryEvent;
     if (command === 'labels') {
       const repo = values.repo ?? '';
       repoParts(repo);
       event = { name: 'workflow_dispatch', repo, inputs: {} };
     } else event = readEvent(env);
-    if (!values['dry-run'] && !env.APP_TOKEN)
-      throw new Error('APP_TOKEN is required');
-    if (!values['dry-run'] && command === 'dispatch' && !env.USER_TOKEN)
+    const token = command === 'build-prompt' ? env.GITHUB_TOKEN : env.APP_TOKEN;
+    if (!values['dry-run'] && !token)
       throw new Error(
-        'USER_TOKEN (COPILOT_ASSIGN_TOKEN) is required for dispatch',
+        command === 'build-prompt'
+          ? 'GITHUB_TOKEN is required for build-prompt'
+          : 'APP_TOKEN is required',
       );
-    let appClient = createClient(env.APP_TOKEN ?? '', env.GITHUB_API_URL);
+    const needsUser = command === 'dispatch' || command === 'ai-command';
+    if (!values['dry-run'] && needsUser && !env.USER_TOKEN)
+      throw new Error(
+        'USER_TOKEN (COPILOT_ASSIGN_TOKEN) is required for dispatch/ai-command',
+      );
+    let appClient = createClient(token ?? '', env.GITHUB_API_URL);
     // Automerge and labels never instantiate a user-token client.
-    let userClient =
-      command === 'dispatch'
-        ? createClient(env.USER_TOKEN ?? '', env.GITHUB_API_URL)
-        : appClient;
+    let userClient = needsUser
+      ? createClient(env.USER_TOKEN ?? '', env.GITHUB_API_URL)
+      : appClient;
     if (values['dry-run']) {
       appClient = dryRunClient(appClient, log);
       userClient = dryRunClient(userClient, log);
     }
-    const repo = await appClient.getRepo(event.repo);
-    // Configuration is trusted default-branch data, never content from the PR head.
-    const config = await loadConfig(appClient, repo, repo.default_branch);
-    const commands = { dispatch, automerge, labels };
-    await commands[command as keyof typeof commands].run({
+    let config = DEFAULT_CONFIG;
+    // Publication only needs Issues permission; prompt building only uses read credentials.
+    if (!['build-prompt', 'post-plan', 'post-answer'].includes(command!)) {
+      const repo = await appClient.getRepo(event.repo);
+      // Configuration is trusted default-branch data, never content from the PR head.
+      config = await loadConfig(appClient, repo, repo.default_branch);
+    }
+    const deps = {
       event,
       appClient,
       userClient,
       config,
       log,
-    });
+    };
+    if (command === 'build-prompt') {
+      await buildPrompt.run(deps, {
+        mode: parseMode(values.mode),
+        outputDir: values['output-dir'],
+        dryRun: values['dry-run'],
+      });
+    } else if (command === 'post-plan' || command === 'post-answer') {
+      return await post.run(deps, {
+        mode: command === 'post-plan' ? 'plan' : 'ask',
+        outputDir: values['output-dir'],
+      });
+    } else if (command === 'dispatch' || command === 'ai-command') {
+      const result = await (command === 'dispatch' ? dispatch : aiCommand).run(
+        deps,
+      );
+      // Only fixed modes and validated numeric IDs cross the Actions output boundary.
+      if (env.GITHUB_OUTPUT && !values['dry-run'])
+        appendFileSync(
+          env.GITHUB_OUTPUT,
+          `mode=${result.mode}\nissue=${result.issue}\ncomment_id=${result.comment_id}\n`,
+        );
+    } else {
+      await (command === 'labels' ? labels : automerge).run(deps);
+    }
     return 0;
   } catch (error) {
     let message = 'Unexpected factory error';

@@ -13,6 +13,7 @@ it('suppresses every write method, including automerge, reviews, reactions and c
   await client.enablePullRequestAutoMerge(repo, 'node-id', 'squash');
   await client.requestReviewers(repo, 13, ['human'], ['team']);
   await client.addReaction(repo, 1, 'eyes');
+  await client.removeAssignees(repo, 12, ['copilot-swe-agent[bot]']);
   await client.assignCopilot(repo, 12, {
     assignees: ['copilot-swe-agent[bot]'],
     agent_assignment: {
@@ -33,6 +34,6 @@ it('suppresses every write method, including automerge, reviews, reactions and c
     true,
   );
   expect(await client.getIssue(repo, 12)).toMatchObject({ number: 12 });
-  expect(logs).toHaveLength(9);
+  expect(logs).toHaveLength(10);
   expect(state.writes).toHaveLength(0);
 });
