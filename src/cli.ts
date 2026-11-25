@@ -16,6 +16,7 @@ import * as post from './commands/post.js';
 import { parseMode } from './copilot-cli.js';
 import * as selfHeal from './commands/self-heal.js';
 import * as watchdog from './commands/watchdog.js';
+import * as requirements from './commands/requirements.js';
 
 function escapeAnnotation(value: string): string {
   return value.replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A');
@@ -56,6 +57,8 @@ export async function main(
         repo: { type: 'string' },
         mode: { type: 'string' },
         'output-dir': { type: 'string' },
+        'input-dir': { type: 'string' },
+        issue: { type: 'string' },
       },
     });
     const command = positionals[0];
@@ -71,18 +74,41 @@ export async function main(
         'post-answer',
         'self-heal',
         'watchdog',
+        'requirements',
+        'requirements-apply',
       ].includes(command ?? '')
     )
       throw new Error(
-        'Usage: factory dispatch|automerge|labels|ai-command|build-prompt|post-plan|post-answer|self-heal|watchdog [--dry-run] [--repo OWNER/REPO (labels only)] [--mode ask|plan (build-prompt only)] [--output-dir PATH (prompt/post only)]',
+        'Usage: factory dispatch|automerge|labels|ai-command|build-prompt|post-plan|post-answer|self-heal|watchdog|requirements|requirements-apply [--dry-run] [--repo OWNER/REPO (labels only)] [--mode ask|plan (build-prompt only)] [--issue N (requirements scan)] [--input-dir PATH (requirements-apply)] [--output-dir PATH]',
       );
     if (values.repo && command !== 'labels')
       throw new Error('--repo is only supported for labels');
+    if (values['input-dir'] && command !== 'requirements-apply')
+      throw new Error('--input-dir is only supported for requirements-apply');
+    if (values.issue && command !== 'requirements')
+      throw new Error('--issue is only supported for requirements');
+    const requestedIssue =
+      values.issue === undefined ? undefined : Number(values.issue);
+    if (
+      requestedIssue !== undefined &&
+      (!Number.isSafeInteger(requestedIssue) || requestedIssue <= 0)
+    )
+      throw new Error('--issue must be a positive integer');
+    if (command === 'requirements-apply' && values['dry-run'])
+      throw new Error(
+        'Use requirements --dry-run to inspect the plan; apply dry-run is not supported',
+      );
     if (values.mode && command !== 'build-prompt')
       throw new Error('--mode is only supported for build-prompt');
     if (
       values['output-dir'] &&
-      !['build-prompt', 'post-plan', 'post-answer'].includes(command!)
+      ![
+        'build-prompt',
+        'post-plan',
+        'post-answer',
+        'requirements',
+        'requirements-apply',
+      ].includes(command!)
     )
       throw new Error(
         '--output-dir is only supported for prompt/post commands',
@@ -100,12 +126,15 @@ export async function main(
           ? 'GITHUB_TOKEN is required for build-prompt'
           : 'APP_TOKEN is required',
       );
-    const needsUser = ['dispatch', 'ai-command', 'self-heal'].includes(
-      command!,
-    );
+    const needsUser = [
+      'dispatch',
+      'ai-command',
+      'self-heal',
+      'requirements-apply',
+    ].includes(command!);
     if (!values['dry-run'] && needsUser && !env.USER_TOKEN)
       throw new Error(
-        'USER_TOKEN (COPILOT_ASSIGN_TOKEN) is required for dispatch/ai-command/self-heal',
+        'USER_TOKEN (COPILOT_ASSIGN_TOKEN) is required for dispatch/ai-command/self-heal/requirements-apply',
       );
     let appClient = createClient(token ?? '', env.GITHUB_API_URL);
     // Automerge and labels never instantiate a user-token client.
@@ -130,7 +159,32 @@ export async function main(
       config,
       log,
     };
-    if (command === 'build-prompt') {
+    if (command === 'requirements') {
+      const plan = (
+        await requirements.scan(
+          deps,
+          values['dry-run'] ? undefined : values['output-dir'],
+          requestedIssue,
+        )
+      ).map(({ issue, mode }) => ({ issue, mode }));
+      log(JSON.stringify(plan));
+      if (env.GITHUB_OUTPUT && !values['dry-run'])
+        appendFileSync(env.GITHUB_OUTPUT, `plan=${JSON.stringify(plan)}\n`);
+    } else if (command === 'requirements-apply') {
+      const snapshot = requirements.readSnapshot(values['input-dir'] ?? 'out');
+      let raw: string | undefined;
+      if (snapshot.mode !== 'release') {
+        try {
+          raw = requirements.readArtifact(
+            values['output-dir'] ?? 'out',
+            'issues.json',
+          );
+        } catch {
+          raw = '';
+        } // Missing/oversized output follows the once-per-hash validation path.
+      }
+      return await requirements.apply(deps, snapshot, raw);
+    } else if (command === 'build-prompt') {
       await buildPrompt.run(deps, {
         mode: parseMode(values.mode),
         outputDir: values['output-dir'],

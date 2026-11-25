@@ -1,4 +1,4 @@
-# Factory verification: Phases 1–3
+# Factory verification: Phases 1–4
 
 ## Local checks
 
@@ -74,8 +74,8 @@ of the local tests.
 9. Inspect run logs: no tokens or full webhook payloads, and factory checkout
    only in `pull_request_target`. The automerge job has no user token.
 
-Requirements execution is a later phase. Phase 2 command/planning and Phase 3
-self-heal/watchdog checks are below.
+Phase 2 command/planning, Phase 3 self-heal/watchdog, and Phase 4 requirements
+checks are below. Metrics and rollout automation remain outside this implementation.
 
 ## Accepted Phase 1 interpretations
 
@@ -338,9 +338,150 @@ match the Phase 3 table; watchdog receives no user or Copilot CLI token.
    Review watchdog's summary table and 50-item cap. Inspect both workflow checkouts
    and environments to confirm no PR code execution and the intended identity split.
 
-## Phase 3 planner questions
+## Accepted Phase 3 interpretations
 
-Confirm the comment-before-counter repair ordering, label-before-notice watchdog
-ordering, one escalation per exhausted PR, and cleanup deferral while another
-linked PR is open. Confirm that automerge's stale-label removal should remain
-PR-only. No Phase 4 requirements engine is implemented.
+The planner accepted removing all shell tools, comment-before-counter repair
+ordering, label-before-notice watchdog ordering, one escalation per exhausted PR,
+cleanup deferral while another linked PR is open, the cap on processed candidates,
+and PR-only stale-label removal by automerge.
+
+## Phase 4 local verification and design
+
+Final local checks passed under Node.js 24:
+
+| Check                                              | Result                                                 |
+| -------------------------------------------------- | ------------------------------------------------------ |
+| `npm ci --cache /private/tmp/ai-factory-npm-cache` | Passed; 177 packages installed in the sandbox          |
+| `npm run lint`                                     | Passed (ESLint and Prettier)                           |
+| `npm run typecheck`                                | Passed                                                 |
+| `npm test`                                         | Passed: 312 tests in 34 files (including amendment)    |
+| `actionlint`                                       | Passed for all factory workflows and the target caller |
+| Protected paths / `git diff --check`               | Planner edits preserved; no agent edits / passed       |
+
+The full lifecycle test is `test/commands/requirements.test.ts`: analyze creates
+four task issues and native dependency/sub-issue links; three independent tasks
+are assigned through the user client; closing their blocker releases the fourth;
+closing all tasks triggers review; `[]` posts the completion comment and closes
+the requirements issue as completed. Replaying successful work adds no writes.
+All API transport tests use mocked fetch; all lifecycle tests use the in-memory
+fake. No real Copilot session or GitHub writes were performed.
+
+The named state, graph, validator, mode, release, and lifecycle suites cover every
+specified rule. Additional tests cover orphaned creations, partial reviews,
+assignment/label failures, closure recovery, stale snapshots, forged attribution,
+schema and dependency errors together, marker injection, input staging and
+symlinks, CLI artifact handoff, mode-specific tool grants, and workflow permissions.
+
+REST shapes were verified against GitHub's
+[sub-issue documentation](https://docs.github.com/en/rest/issues/sub-issues#add-sub-issue)
+and [issue dependency documentation](https://docs.github.com/en/rest/issues/issue-dependencies#add-a-dependency-an-issue-is-blocked-by).
+The parent/current issue **number** belongs in the URL; the child database **id**
+goes in `sub_issue_id`, and the blocker database **id** goes in `issue_id`.
+These calls are isolated and documented in `src/github/octokit.ts`. Pagination,
+distinct IDs versus numbers, existing-link checks, and `state_reason: completed`
+have transport tests. Issue creation disables blind SDK retries: the next apply
+resolves uncertain creation results by trusted task markers.
+
+The existing Copilot runner now accepts `analyze` and `review`, using the supplied
+**1.0.112** reference files. Those modes allow only `read` and an absolute
+`write(/.../out/issues.json)` rule, with the blanket shell denial preserved.
+Ask/plan modes retain their accepted Phase 3 rules. The trusted requirements
+skill is staged alongside `out/requirements.md`, `out/existing-tasks.json`,
+`out/mode.txt`, and `out/prompt.md`. Staging removes old output and refuses symlink
+directories. Only `out/issues.json` is uploaded as model output. The apply command
+rejects missing, oversized, non-file, or symlink artifacts through the validation
+failure path. Output cannot supply scripts, modes, hashes, or factory source.
+
+`requirements --output-dir out/requirements` is the read-only scan and input
+builder. It emits `plan=[{"issue":N,"mode":"analyze|release|review"}]` to
+`GITHUB_OUTPUT`. Manual `--issue N` or the workflow input restricts the scan.
+`requirements --dry-run` reports the plan without filesystem or GitHub writes.
+`requirements-apply --input-dir PATH --output-dir PATH` consumes a trusted scan
+snapshot separately from model output; apply dry-run is explicitly unsupported.
+An edited/closed/unlabeled parent or changed requirements hash prevents applying
+stale model output. Disabled requirements produce no plan or writes.
+
+The scan job uses a read-only App token, including Contents read for trusted
+factory/config access and Pull requests read for review context. Think has only
+`contents: read`; only its CLI step gets `COPILOT_GITHUB_TOKEN`. Apply gets an App
+token with Issues write and Contents read for current config, plus the user token
+solely for assignment. Apply never checks out target code. Source, input snapshots,
+and model output use separate artifacts, preserving the Phase 2 trust boundary.
+No new runtime dependencies were added.
+
+### Phase 4 accepted interpretations and amendment
+
+- A nested reusable per-issue workflow holds `ai-factory-req-N` across think and
+  apply; the outer scan fans out with `max-parallel: 2`, without cancelling other
+  matrix entries on failure. Timeouts are 5/45/15 minutes. This implements the
+  spec's job diagram without releasing the issue lock between jobs or giving the
+  think job the scan token. Release mode skips think but still reaches apply.
+- Each created task contains a recovery marker before its final `task` marker:
+  the analysis hash, mode, output batch hash, review-round baseline, and dependency IDs. The parent state
+  is not advanced until every task/link succeeds. Repository-wide App-created
+  task markers recover issues created before sub-issue linking failed. An exact
+  interrupted batch may reuse its existing IDs; a new batch repeating an old ID
+  is rejected. Recorded dependencies repair interrupted link writes.
+- Operational recovery can schedule release to repair assignment labels or refresh
+  a stale state table even when the pure mode engine says idle. An interrupted
+  review resumes as review; a completion receipt permits retrying failed closure.
+  An empty resumed review never closes a parent with open gap tasks. These are
+  recovery exceptions around the pure engine's normal decision rules.
+- The hard maximum is `min(15, requirements.max_tasks_per_run)`, honoring the
+  architecture and skill even though configuration permits values up to 30.
+  Strict schemas and embedded factory-marker rejection protect stored state.
+- The planner resolved both lifecycle questions in the Phase 4 amendment.
+  Empty analysis with nothing open now sets `reviewed_hash`, posts
+  **Nothing to implement: the repository already covers these requirements.**
+  with `review kind=complete hash=…`, and closes the parent immediately.
+  Zero tasks also counts as all closed for mode selection and closure recovery.
+- Nonempty review leaves `reviewed_hash` unchanged and increments `review_rounds`
+  exactly once. Closing the gap tasks permits another review. State parsing
+  defaults older markers without `review_rounds` to zero. Snapshots and recovery
+  markers carry the round baseline so reruns cannot double-count rounds or use
+  an earlier review's output to complete a later round.
+- After three gap-producing rounds finish, the parent gets `ai:human-needed`
+  and one `review kind=cap hash=…` comment, then stays idle. The scan routes this
+  one notification through the existing apply-only release job so its token stays
+  read-only and no fourth Copilot think job runs. Editing the normalized body
+  triggers analysis and resets the count to zero. The amendment does not request
+  removing the existing human-needed label; it does not block a new analysis.
+- Amendment tests cover empty first analysis, a gap round followed by successful
+  review, three gap rounds with no fourth review, edit reset, legacy state,
+  zero-task completion recovery, and interrupted state/cap writes. There are no
+  remaining planner questions for this amendment.
+
+## Phase 4 GitHub requirements smoke test (human)
+
+1. Deploy the reviewed factory revision and updated caller. Confirm private
+   reusable-workflow access and App Contents read, Issues read/write, and Pull
+   requests read permissions. Keep the existing user assignment and Copilot CLI
+   credentials separate. The caller has an hourly requirements schedule, separate
+   from the half-hour watchdog schedule, plus edited/labeled issue triggers.
+2. Open an issue labeled `requirements` describing three related features, for
+   example an entity, REST API, and UI screen. Wait up to an hour or manually run
+   the caller with its `issue` input. Expect one updated-in-place state comment,
+   task sub-issues with final task markers, and native blocked-by links.
+3. Verify at most three tasks are assigned concurrently with the default config;
+   dependencies can reduce that number. Merge/close a blocker and run the hourly
+   workflow again. Expect the next eligible task to be assigned as the licensed
+   bot user, with `ai:in-progress` written by the App.
+4. Complete all tasks and trigger review. With no remaining gaps, expect
+   `out/issues.json` to contain `[]`, one **All requirements implemented.** comment,
+   a reviewed state hash, and the parent closed as completed. If review creates
+   gaps, verify their dependencies and releases, then confirm another review runs
+   after those tasks close. Nonempty review must increment `review_rounds` without
+   setting `reviewed_hash`.
+5. Rerun completed jobs: no duplicate tasks, sub-issue links, dependencies,
+   assignments, or comments. If feasible, interrupt creation/linking/assignment
+   and retry. Edit the parent during think: the old output must be skipped, and
+   the next scan must analyze the changed requirements without repeating old IDs.
+6. Inspect workflow permissions and artifacts. Think must have no write permission
+   and no App/user API token; model output must contain only `issues.json`.
+   Verify native endpoint permissions and real Copilot behavior on GitHub; local
+   fake/transport tests cannot establish those live results.
+7. Test requirements already implemented by the repository: an empty first analysis
+   must close immediately with the **Nothing to implement** comment. In a sandbox
+   scenario producing three gap rounds, complete each round and confirm exactly one
+   human-needed escalation and no fourth review. Edit the requirements body and
+   confirm a new analysis resets `review_rounds` to zero.

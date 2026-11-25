@@ -10,6 +10,7 @@ import {
 const actor = z.object({ login: z.string().min(1), type: z.string() });
 const label = z.union([z.string(), z.object({ name: z.string() })]);
 const issueSchema = z.object({
+  id: z.number().int().positive().optional(),
   updated_at: z.string().optional(),
   title: z.string().optional(),
   number: z.number().int().positive(),

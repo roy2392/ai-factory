@@ -13,6 +13,8 @@ export async function run(
     dryRun = false,
   }: { mode: ThinkMode; outputDir?: string; dryRun?: boolean },
 ): Promise<void> {
+  if (mode !== 'ask' && mode !== 'plan')
+    throw new Error('build-prompt only supports ask or plan');
   if (event.name !== 'issues' && event.name !== 'issue_comment')
     throw new Error('build-prompt requires an issue event');
   if (event.issue.pull_request)

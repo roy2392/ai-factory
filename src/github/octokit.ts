@@ -6,9 +6,9 @@ import { parseIssue, parsePullRequest } from '../context.js';
 import {
   repoParts,
   type Assignment,
+  type Issue,
   type Comment,
   type GitHubClient,
-  type Issue,
   type Label,
   type LabelResult,
   type MergeMethod,
@@ -20,6 +20,80 @@ import {
 
 const Client = Octokit.plugin(retry, throttling);
 export class OctokitGitHubClient implements GitHubClient {
+  // Verified: https://docs.github.com/en/rest/issues/sub-issues#add-sub-issue
+  // and https://docs.github.com/en/rest/issues/issue-dependencies#add-a-dependency-an-issue-is-blocked-by
+  // URL paths take the issue NUMBER; body sub_issue_id / issue_id take database IDs.
+  async listSubIssues(repo: string, number: number): Promise<Issue[]> {
+    return (
+      await this.octokit.paginate(
+        'GET /repos/{owner}/{repo}/issues/{issue_number}/sub_issues',
+        { ...repoParts(repo), issue_number: number, per_page: 100 },
+      )
+    ).map(parseIssue);
+  }
+  async addSubIssue(
+    repo: string,
+    parent: number,
+    childId: number,
+  ): Promise<void> {
+    if ((await this.listSubIssues(repo, parent)).some((i) => i.id === childId))
+      return;
+    await this.octokit.request(
+      'POST /repos/{owner}/{repo}/issues/{issue_number}/sub_issues',
+      { ...repoParts(repo), issue_number: parent, sub_issue_id: childId },
+    );
+  }
+  async listBlockedBy(repo: string, number: number): Promise<Issue[]> {
+    return (
+      await this.octokit.paginate(
+        'GET /repos/{owner}/{repo}/issues/{issue_number}/dependencies/blocked_by',
+        { ...repoParts(repo), issue_number: number, per_page: 100 },
+      )
+    ).map(parseIssue);
+  }
+  async addBlockedBy(
+    repo: string,
+    number: number,
+    blockerIssueId: number,
+  ): Promise<void> {
+    if (
+      (await this.listBlockedBy(repo, number)).some(
+        (i) => i.id === blockerIssueId,
+      )
+    )
+      return;
+    await this.octokit.request(
+      'POST /repos/{owner}/{repo}/issues/{issue_number}/dependencies/blocked_by',
+      { ...repoParts(repo), issue_number: number, issue_id: blockerIssueId },
+    );
+  }
+  // The command checks trusted task markers before creating an issue.
+  async createIssue(repo: string, title: string, body: string): Promise<Issue> {
+    return parseIssue(
+      (
+        await this.octokit.rest.issues.create({
+          ...repoParts(repo),
+          title,
+          body,
+          // Resolve uncertain creations through task markers on the next apply,
+          // rather than blindly replaying a non-idempotent POST inside the SDK.
+          request: { retries: 0 },
+        })
+      ).data,
+    );
+  }
+  async closeIssue(repo: string, number: number): Promise<void> {
+    if ((await this.getIssue(repo, number)).state === 'closed') return;
+    await this.octokit.rest.issues.update({
+      ...repoParts(repo),
+      issue_number: number,
+      state: 'closed',
+      state_reason: 'completed',
+    });
+  }
+  async listIssuesByLabel(repo: string, label: string): Promise<Issue[]> {
+    return this.listIssues(repo, 'open', [label]);
+  }
   readonly octokit: InstanceType<typeof Client>;
   private readonly fetch: typeof globalThis.fetch;
   private readonly apiOrigin: string;

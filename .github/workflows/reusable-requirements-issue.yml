@@ -1,0 +1,110 @@
+name: Factory requirements issue
+on:
+  workflow_call:
+    inputs:
+      issue:
+        type: number
+        required: true
+      mode:
+        type: string
+        required: true
+    secrets:
+      FACTORY_APP_ID:
+        required: true
+      FACTORY_APP_PRIVATE_KEY:
+        required: true
+      COPILOT_ASSIGN_TOKEN:
+        required: true
+      COPILOT_CLI_TOKEN:
+        required: true
+permissions: {}
+concurrency:
+  group: ai-factory-req-${{ inputs.issue }}
+  cancel-in-progress: false
+jobs:
+  think:
+    if: inputs.mode == 'analyze' || inputs.mode == 'review'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          path: target
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: requirements-source-${{ github.run_id }}
+          path: .factory
+      - uses: actions/download-artifact@v4
+        with:
+          name: requirements-inputs-${{ github.run_id }}
+          path: .requirements-inputs
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: npm ci
+        working-directory: .factory
+      - name: Stage the skill and inputs
+        working-directory: target
+        env:
+          ISSUE: ${{ inputs.issue }}
+        run: ../.factory/node_modules/.bin/tsx ../.factory/src/stage-requirements.ts "../.requirements-inputs/$ISSUE" ../.factory/skills/requirements-breakdown/SKILL.md
+      - name: Install the verified Copilot CLI
+        run: npm install --global @github/copilot@1.0.112
+      - name: Run the mode-aware isolated runner
+        working-directory: target
+        run: ../.factory/node_modules/.bin/tsx ../.factory/src/run-copilot.ts
+        env:
+          COPILOT_GITHUB_TOKEN: ${{ secrets.COPILOT_CLI_TOKEN }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: requirements-output-${{ github.run_id }}-${{ inputs.issue }}
+          path: target/out/issues.json
+          overwrite: true
+          retention-days: 1
+          if-no-files-found: error
+  apply:
+    needs: think
+    if: ${{ always() && !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      issues: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: requirements-source-${{ github.run_id }}
+          path: .factory
+      - uses: actions/download-artifact@v4
+        with:
+          name: requirements-inputs-${{ github.run_id }}
+          path: .requirements-inputs
+      - uses: actions/download-artifact@v4
+        if: needs.think.result == 'success'
+        continue-on-error: true
+        with:
+          name: requirements-output-${{ github.run_id }}-${{ inputs.issue }}
+          path: .model-output
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: npm ci
+        working-directory: .factory
+      - uses: actions/create-github-app-token@v2
+        id: app
+        with:
+          app-id: ${{ secrets.FACTORY_APP_ID }}
+          private-key: ${{ secrets.FACTORY_APP_PRIVATE_KEY }}
+          permission-contents: read
+          permission-issues: write
+      - name: Apply validated tasks or release ready work
+        working-directory: .factory
+        env:
+          APP_TOKEN: ${{ steps.app.outputs.token }}
+          FACTORY_APP_LOGIN: ${{ steps.app.outputs.app-slug }}[bot]
+          USER_TOKEN: ${{ secrets.COPILOT_ASSIGN_TOKEN }}
+          ISSUE: ${{ inputs.issue }}
+        run: npx --no-install tsx src/cli.ts requirements-apply --input-dir "../.requirements-inputs/$ISSUE" --output-dir ../.model-output

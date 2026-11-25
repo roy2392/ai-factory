@@ -1,10 +1,16 @@
 import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
 
 export const COPILOT_CLI_VERSION = '1.0.112';
-export type ThinkMode = 'ask' | 'plan';
+export type ThinkMode = 'ask' | 'plan' | 'analyze' | 'review';
 export function parseMode(value: string | undefined): ThinkMode {
-  if (value !== 'ask' && value !== 'plan')
-    throw new Error('Mode must be ask or plan');
+  if (
+    value !== 'ask' &&
+    value !== 'plan' &&
+    value !== 'analyze' &&
+    value !== 'review'
+  )
+    throw new Error('Mode must be ask, plan, analyze or review');
   return value;
 }
 
@@ -33,7 +39,9 @@ export function buildCliArgs({
     '--allow-tool',
     'read',
     '--allow-tool',
-    'write',
+    mode === 'analyze' || mode === 'review'
+      ? `write(${resolve(dirname(promptFile), 'issues.json')})`
+      : 'write',
     // Permission rules cannot constrain git options (-c aliases, pagers,
     // external diff/textconv) or find -exec. Built-in read tools cover discovery.
     // Deny all shell execution, including implicitly classified read-only commands.

@@ -90,9 +90,9 @@ For each open issue labeled `requirements`, compute the mode from GitHub state (
 
 | Mode | When | Does |
 |---|---|---|
-| `analyze` | body hash differs from the state marker, or no marker | Copilot CLI + `skills/requirements-breakdown` writes `out/issues.json`; validate; create sub-issues |
+| `analyze` | body hash differs from the state marker, or no marker | Copilot CLI + `skills/requirements-breakdown` writes `out/issues.json`; validate; create sub-issues. An empty result with nothing open closes the issue |
 | `release` | some sub-issue is not started and all its blockers are closed | assign ready sub-issues to Copilot, at most `max_open` in progress |
-| `review` | every sub-issue closed and `reviewed_hash` ≠ current hash | Copilot CLI looks for gaps; none → close the requirements issue; gaps → new sub-issues |
+| `review` | every sub-issue closed (or none), `reviewed_hash` ≠ current hash, fewer than 3 review rounds | Copilot CLI looks for gaps; none → close the requirements issue; gaps → new sub-issues and another round. After 3 rounds → `ai:human-needed` |
 | `idle` | otherwise | nothing |
 
 - **Task issues** are real sub-issues of the requirements issue. Each body ends with

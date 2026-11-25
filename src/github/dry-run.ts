@@ -1,6 +1,10 @@
 import type { GitHubClient } from './client.js';
 
 const writes = new Set<keyof GitHubClient>([
+  'createIssue',
+  'closeIssue',
+  'addSubIssue',
+  'addBlockedBy',
   'createComment',
   'updateComment',
   'addLabels',

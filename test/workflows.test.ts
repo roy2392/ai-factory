@@ -12,6 +12,8 @@ interface Step {
   if?: string;
 }
 interface Job {
+  strategy?: { 'max-parallel'?: number; 'fail-fast'?: boolean };
+  needs?: string;
   permissions?: Record<string, string>;
   env?: Record<string, string>;
   steps?: Step[];
@@ -26,6 +28,70 @@ interface Workflow {
 }
 const workflow = (name: string) =>
   parse(readFileSync(`.github/workflows/${name}.yml`, 'utf8')) as Workflow;
+
+describe('Phase 4 workflow isolation', () => {
+  it('holds a per-requirements lock across think/apply and limits the fanout to two', () => {
+    const scan = workflow('reusable-requirements');
+    const perIssue = workflow('reusable-requirements-issue');
+    expect(scan.permissions).toEqual({});
+    expect(scan.jobs.scan?.permissions).toEqual({ issues: 'read' });
+    expect(scan.jobs.scan?.['timeout-minutes']).toBe(5);
+    expect(scan.jobs.process?.strategy?.['max-parallel']).toBe(2);
+    expect(scan.jobs.process?.strategy?.['fail-fast']).toBe(false);
+    expect(perIssue.concurrency).toEqual({
+      group: 'ai-factory-req-${{ inputs.issue }}',
+      'cancel-in-progress': false,
+    });
+    expect(perIssue.jobs.think?.['timeout-minutes']).toBe(45);
+    expect(perIssue.jobs.apply?.['timeout-minutes']).toBe(15);
+    expect(perIssue.jobs.apply?.if).toContain('always()');
+    expect(perIssue.jobs.apply?.needs).toBe('think');
+  });
+  it('gives think only contents read, the CLI only its credential, and publishes only issues.json', () => {
+    const file = workflow('reusable-requirements-issue');
+    const think = file.jobs.think!;
+    expect(think.permissions).toEqual({ contents: 'read' });
+    expect(think.if).toContain("inputs.mode == 'analyze'");
+    expect(think.if).toContain("inputs.mode == 'review'");
+    expect(think.env).toBeUndefined();
+    expect(JSON.stringify(think)).not.toMatch(
+      /APP_TOKEN|USER_TOKEN|"GITHUB_TOKEN"|"GH_TOKEN"|FACTORY_APP_PRIVATE_KEY|create-github-app-token/,
+    );
+  });
+  it('uses isolated trusted source and inputs in apply, and never executes model artifacts', () => {
+    const file = workflow('reusable-requirements-issue');
+    const think = file.jobs.think!;
+    const model = think.steps!.find((s) =>
+      s.run?.includes('src/run-copilot.ts'),
+    )!;
+    expect(Object.keys(model.env!)).toEqual(['COPILOT_GITHUB_TOKEN']);
+    const checkout = think.steps!.find((s) =>
+      s.uses?.startsWith('actions/checkout'),
+    )!;
+    expect(checkout.with).toMatchObject({
+      ref: '${{ github.event.repository.default_branch }}',
+      'persist-credentials': false,
+    });
+    const upload = think.steps!.find((s) =>
+      s.uses?.startsWith('actions/upload-artifact'),
+    )!;
+    expect(upload.with?.path).toBe('target/out/issues.json');
+    expect(JSON.stringify(think)).toContain('@github/copilot@1.0.112');
+    const apply = file.jobs.apply!;
+    expect(apply.permissions).toEqual({ issues: 'write' });
+    expect(
+      apply.steps!.some((s) => s.uses?.startsWith('actions/checkout')),
+    ).toBe(false);
+    expect(JSON.stringify(apply)).not.toContain('COPILOT_CLI_TOKEN');
+    expect(
+      apply.steps!.find((s) => s.run?.includes('requirements-apply'))?.env
+        ?.USER_TOKEN,
+    ).toBe('${{ secrets.COPILOT_ASSIGN_TOKEN }}');
+    expect(apply.steps!.map((s) => s.run).join('\n')).not.toMatch(
+      /bash .*model|source .*model|eval /,
+    );
+  });
+});
 
 describe('Phase 2 workflow isolation', () => {
   it('gives the Copilot step only its credential and the think job only read permissions', () => {

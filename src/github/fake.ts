@@ -17,6 +17,8 @@ export interface WriteCall {
   args: unknown[];
 }
 export class FakeState {
+  subIssues = new Map<string, number[]>();
+  blockedBy = new Map<string, number[]>();
   now = new Date().toISOString();
   jobs = new Map<string, WorkflowJob[]>();
   jobLogs = new Map<string, string>();
@@ -32,6 +34,81 @@ export class FakeState {
 }
 
 export class FakeGitHubClient implements GitHubClient {
+  async listSubIssues(repo: string, number: number): Promise<Issue[]> {
+    const ids = this.state.subIssues.get(`${repo}#${number}`) ?? [];
+    return (await this.listIssues(repo, 'all', [])).filter(
+      (i) => i.id && ids.includes(i.id),
+    );
+  }
+  async addSubIssue(
+    repo: string,
+    parent: number,
+    childId: number,
+  ): Promise<void> {
+    if (!(await this.listIssues(repo, 'all', [])).some((i) => i.id === childId))
+      throw new Error('Unknown child id');
+    const key = `${repo}#${parent}`;
+    const ids = this.state.subIssues.get(key) ?? [];
+    if (!ids.includes(childId)) {
+      this.record('addSubIssue', repo, parent, childId);
+      this.state.subIssues.set(key, [...ids, childId]);
+    }
+  }
+  async listBlockedBy(repo: string, number: number): Promise<Issue[]> {
+    const ids = this.state.blockedBy.get(`${repo}#${number}`) ?? [];
+    return (await this.listIssues(repo, 'all', [])).filter(
+      (i) => i.id && ids.includes(i.id),
+    );
+  }
+  async addBlockedBy(
+    repo: string,
+    number: number,
+    blockerIssueId: number,
+  ): Promise<void> {
+    if (
+      !(await this.listIssues(repo, 'all', [])).some(
+        (i) => i.id === blockerIssueId,
+      )
+    )
+      throw new Error('Unknown blocker id');
+    const key = `${repo}#${number}`;
+    const ids = this.state.blockedBy.get(key) ?? [];
+    if (!ids.includes(blockerIssueId)) {
+      this.record('addBlockedBy', repo, number, blockerIssueId);
+      this.state.blockedBy.set(key, [...ids, blockerIssueId]);
+    }
+  }
+  async createIssue(repo: string, title: string, body: string): Promise<Issue> {
+    const all = await this.listIssues(repo, 'all', []);
+    const number = Math.max(0, ...all.map((i) => i.number)) + 1;
+    const id = Math.max(1000, ...all.map((i) => i.id ?? 0)) + 1;
+    const issue: Issue = {
+      id,
+      number,
+      title,
+      body,
+      state: 'open',
+      html_url: `https://github.com/${repo}/issues/${number}`,
+      user: { login: 'ai-factory[bot]', type: 'Bot' },
+      author_association: 'NONE',
+      labels: [],
+      assignees: [],
+    };
+    this.record('createIssue', repo, title, body);
+    this.state.issues.set(`${repo}#${number}`, issue);
+    return structuredClone(issue);
+  }
+  async closeIssue(repo: string, number: number): Promise<void> {
+    const issue = this.state.issues.get(`${repo}#${number}`);
+    if (!issue) throw new Error('Fake resource not found');
+    if (issue.state !== 'closed') {
+      this.record('closeIssue', repo, number, 'completed');
+      issue.state = 'closed';
+    }
+  }
+  async listIssuesByLabel(repo: string, label: string): Promise<Issue[]> {
+    return this.listIssues(repo, 'open', [label]);
+  }
   readonly writes: WriteCall[] = [];
   constructor(
     readonly state = new FakeState(),

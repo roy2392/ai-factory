@@ -14,6 +14,22 @@ afterEach(() => {
     rmSync(dir, { recursive: true, force: true });
 });
 describe('Copilot CLI invocation', () => {
+  it.each(['analyze', 'review'] as const)(
+    'limits %s writes to the absolute issues.json destination',
+    (mode) => {
+      const dir = mkdtempSync(join(tmpdir(), 'factory-cli-'));
+      dirs.push(dir);
+      const promptFile = join(dir, 'prompt.md');
+      writeFileSync(promptFile, 'Read inputs and write the task array.');
+      const args = buildCliArgs({ promptFile, mode });
+      expect(
+        args.flatMap((arg, i) => (arg === '--allow-tool' ? [args[i + 1]] : [])),
+      ).toEqual(['read', `write(${join(dir, 'issues.json')})`]);
+      expect(
+        args.flatMap((arg, i) => (arg === '--deny-tool' ? [args[i + 1]] : [])),
+      ).toContain('shell');
+    },
+  );
   it.each(['plan', 'ask'] as const)(
     'builds %s arguments from the supplied 1.0.112 reference',
     (mode) => {

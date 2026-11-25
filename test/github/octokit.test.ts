@@ -38,6 +38,87 @@ function transport(
 }
 
 describe('Octokit transport (mock fetch, no network)', () => {
+  it('uses path numbers and database IDs in sub-issue and dependency request bodies, and skips existing links', async () => {
+    const payload = JSON.parse(
+      readFileSync(
+        new URL('../fixtures/issues.opened.json', import.meta.url),
+        'utf8',
+      ),
+    ) as { issue: Record<string, unknown> };
+    const child = { ...payload.issue, number: 13, id: 98765 };
+    const { client, calls } = transport([
+      { data: [] },
+      { data: child },
+      { data: [child] },
+      { data: [] },
+      { data: child },
+      { data: [child] },
+    ]);
+    await client.addSubIssue(repo, 12, 98765);
+    await client.addSubIssue(repo, 12, 98765);
+    await client.addBlockedBy(repo, 14, 98765);
+    await client.addBlockedBy(repo, 14, 98765);
+    expect(calls[1]?.url).toContain('/issues/12/sub_issues');
+    expect(JSON.parse(String(calls[1]?.init?.body))).toEqual({
+      sub_issue_id: 98765,
+    });
+    expect(calls[4]?.url).toContain('/issues/14/dependencies/blocked_by');
+    expect(JSON.parse(String(calls[4]?.init?.body))).toEqual({
+      issue_id: 98765,
+    });
+    expect(calls.filter((c) => c.init?.method === 'POST')).toHaveLength(2);
+  });
+  it('paginates sub-issues and dependencies preserving database IDs', async () => {
+    const payload = JSON.parse(
+      readFileSync(
+        new URL('../fixtures/issues.opened.json', import.meta.url),
+        'utf8',
+      ),
+    ) as { issue: Record<string, unknown> };
+    const a = { ...payload.issue, number: 13, id: 900 };
+    const b = { ...payload.issue, number: 14, id: 901 };
+    for (const method of ['listSubIssues', 'listBlockedBy'] as const) {
+      const { client, calls } = transport([
+        {
+          data: [a],
+          headers: {
+            link: '<https://github.example.test/api/v3/page2>; rel="next"',
+          },
+        },
+        { data: [b] },
+      ]);
+      expect((await client[method](repo, 12)).map((i) => i.id)).toEqual([
+        900, 901,
+      ]);
+      expect(calls).toHaveLength(2);
+    }
+  });
+  it('creates task issues and closes requirements as completed only once', async () => {
+    const payload = JSON.parse(
+      readFileSync(
+        new URL('../fixtures/issues.opened.json', import.meta.url),
+        'utf8',
+      ),
+    ) as { issue: Record<string, unknown> };
+    const { client, calls } = transport([
+      { data: { ...payload.issue, id: 1012 } },
+      { data: payload.issue },
+      { data: {} },
+      { data: { ...payload.issue, state: 'closed' } },
+    ]);
+    expect((await client.createIssue(repo, 'Task', 'Body')).id).toBe(1012);
+    await client.closeIssue(repo, 12);
+    await client.closeIssue(repo, 12);
+    expect(JSON.parse(String(calls[0]?.init?.body))).toEqual({
+      title: 'Task',
+      body: 'Body',
+    });
+    expect(JSON.parse(String(calls[2]?.init?.body))).toEqual({
+      state: 'closed',
+      state_reason: 'completed',
+    });
+    expect(calls.filter((c) => c.init?.method === 'PATCH')).toHaveLength(1);
+  });
   it('downloads job logs through a signed redirect without forwarding the App token', async () => {
     const { client, calls } = transport([
       {

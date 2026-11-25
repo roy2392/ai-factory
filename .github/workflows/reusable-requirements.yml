@@ -1,0 +1,117 @@
+name: Factory requirements
+on:
+  workflow_call:
+    inputs:
+      factory_repo:
+        type: string
+        required: true
+      factory_ref:
+        type: string
+        default: v1
+    secrets:
+      FACTORY_APP_ID:
+        required: true
+      FACTORY_APP_PRIVATE_KEY:
+        required: true
+      COPILOT_ASSIGN_TOKEN:
+        required: true
+      COPILOT_CLI_TOKEN:
+        required: true
+permissions: {}
+# Scan is read-only; the nested workflow holds each issue lock across think/apply.
+concurrency:
+  group: ai-factory-requirements-scan-${{ github.repository }}-${{ github.run_id }}
+  cancel-in-progress: false
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      issues: read
+    outputs:
+      plan: ${{ steps.scan.outputs.plan }}
+    steps:
+      - name: Resolve repositories
+        id: repos
+        env:
+          FACTORY_REPO: ${{ inputs.factory_repo }}
+        shell: bash
+        run: |
+          if [[ "$FACTORY_REPO" != "$GITHUB_REPOSITORY_OWNER/"* ]]; then
+            echo '::error::The factory and target repositories must share an owner.'
+            exit 1
+          fi
+          echo "factory=${FACTORY_REPO#*/}" >> "$GITHUB_OUTPUT"
+          echo "target=${GITHUB_REPOSITORY#*/}" >> "$GITHUB_OUTPUT"
+      - uses: actions/create-github-app-token@v2
+        id: app
+        with:
+          app-id: ${{ secrets.FACTORY_APP_ID }}
+          private-key: ${{ secrets.FACTORY_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: |
+            ${{ steps.repos.outputs.target }}
+            ${{ steps.repos.outputs.factory }}
+          permission-contents: read
+          permission-issues: read
+          permission-pull-requests: read
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ inputs.factory_repo }}
+          ref: ${{ inputs.factory_ref }}
+          path: .factory
+          token: ${{ steps.app.outputs.token }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: npm ci
+        working-directory: .factory
+      - name: Scan and prepare trusted inputs
+        id: scan
+        run: npx --no-install tsx src/cli.ts requirements --output-dir out/requirements
+        working-directory: .factory
+        env:
+          APP_TOKEN: ${{ steps.app.outputs.token }}
+          FACTORY_APP_LOGIN: ${{ steps.app.outputs.app-slug }}[bot]
+      - uses: actions/upload-artifact@v4
+        if: steps.scan.outputs.plan != '[]'
+        with:
+          name: requirements-source-${{ github.run_id }}
+          path: |
+            .factory/src/
+            .factory/package.json
+            .factory/package-lock.json
+            .factory/tsconfig.json
+            .factory/skills/requirements-breakdown/SKILL.md
+          overwrite: true
+          retention-days: 1
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: steps.scan.outputs.plan != '[]'
+        with:
+          name: requirements-inputs-${{ github.run_id }}
+          path: .factory/out/requirements/
+          overwrite: true
+          retention-days: 1
+          if-no-files-found: error
+  process:
+    needs: scan
+    if: needs.scan.outputs.plan != '[]'
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        include: ${{ fromJSON(needs.scan.outputs.plan) }}
+    permissions:
+      contents: read
+      issues: write
+    uses: ./.github/workflows/reusable-requirements-issue.yml
+    with:
+      issue: ${{ matrix.issue }}
+      mode: ${{ matrix.mode }}
+    secrets:
+      FACTORY_APP_ID: ${{ secrets.FACTORY_APP_ID }}
+      FACTORY_APP_PRIVATE_KEY: ${{ secrets.FACTORY_APP_PRIVATE_KEY }}
+      COPILOT_ASSIGN_TOKEN: ${{ secrets.COPILOT_ASSIGN_TOKEN }}
+      COPILOT_CLI_TOKEN: ${{ secrets.COPILOT_CLI_TOKEN }}

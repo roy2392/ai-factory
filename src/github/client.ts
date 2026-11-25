@@ -9,6 +9,7 @@ export interface Actor {
 }
 
 export interface Issue {
+  id?: number;
   updated_at?: string;
   title?: string;
   number: number;
@@ -87,6 +88,17 @@ export interface Assignment {
 }
 
 export interface GitHubClient {
+  listSubIssues(repo: string, number: number): Promise<Issue[]>;
+  addSubIssue(repo: string, parent: number, childId: number): Promise<void>;
+  listBlockedBy(repo: string, number: number): Promise<Issue[]>;
+  addBlockedBy(
+    repo: string,
+    number: number,
+    blockerIssueId: number,
+  ): Promise<void>;
+  createIssue(repo: string, title: string, body: string): Promise<Issue>;
+  closeIssue(repo: string, number: number): Promise<void>;
+  listIssuesByLabel(repo: string, label: string): Promise<Issue[]>;
   listWorkflowJobs(repo: string, runId: number): Promise<WorkflowJob[]>;
   downloadJobLog(repo: string, jobId: number): Promise<string>;
   listPullRequests(
