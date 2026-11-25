@@ -14,8 +14,8 @@ the spec and the acceptance criteria → fixes go back to Codex (resume) → pha
 | # | Phase | Spec | Status |
 |---|---|---|---|
 | 1 | Foundation + core loop (issue → Copilot → PR → auto-merge) | [phase-1](specs/phase-1-foundation-core-loop.md) | **done** (c988b51) |
-| 2 | `/ai` commands and the plan gate | [phase-2](specs/phase-2-commands-plan-gate.md) | in progress (Codex) |
-| 3 | Self-heal and watchdog | [phase-3](specs/phase-3-self-heal-watchdog.md) | spec ready |
+| 2 | `/ai` commands and the plan gate | [phase-2](specs/phase-2-commands-plan-gate.md) | **done** |
+| 3 | Self-heal and watchdog | [phase-3](specs/phase-3-self-heal-watchdog.md) | in progress (Codex) |
 | 4 | Requirements engine (sub-issues, dependencies, release) | [phase-4](specs/phase-4-requirements.md) | spec ready |
 | 5 | Rollout: showcase repo, eval set, metrics | [phase-5](specs/phase-5-rollout.md) | spec ready (mostly human) |
 
