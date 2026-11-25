@@ -11,7 +11,8 @@
     "format": "prettier --write .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "factory": "tsx src/cli.ts"
+    "factory": "tsx src/cli.ts",
+    "create-app": "tsx scripts/create-github-app.ts"
   },
   "dependencies": {
     "@octokit/plugin-retry": "^8.1.1",

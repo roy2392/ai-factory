@@ -23,6 +23,31 @@ Also set an organization **variable** (not a secret) `COPILOT_BOT_LOGIN` = the b
 uses it so the bot is never requested as a reviewer of its own PRs.
 
 ## 3. GitHub App
+### Fast path
+
+With Node.js 24, dependencies installed (`npm ci`), and GitHub CLI authenticated
+(`gh auth login`) with access to manage the target repository's secrets, run:
+
+```sh
+npm run create-app -- --owner roy2392 --repos ai-factory,ai-factory-showcase --secrets-repo roy2392/ai-factory-showcase
+```
+
+The script opens a local page; click **Create GitHub App on github.com** and confirm
+in GitHub within 15 minutes. Sign in as the intended App owner: this flow creates
+a personal-account App. `--owner` supplies the name/homepage, not an ownership
+transfer. Use `--name NAME` if the default `ai-factory-OWNER` name is already taken.
+The callback saves `~/.config/ai-factory/<slug>.pem` with mode `0600` inside a `0700`
+directory, then sends the App ID and key to `gh secret set` through stdin. Existing
+keys are preserved unless `--force` is given. If `gh` fails, follow the printed
+manual commands; they read the key file without displaying it.
+
+Click the printed installation link and select both the factory and target repos.
+`--repos` is an installation reminder; `--secrets-repo` receives the two repository
+secrets. For organization secrets or organization-owned Apps, use the manual steps
+below. The script never prints the private key, client secret, or webhook secret.
+
+### Manual fallback
+
 Create the App `ai-factory` (no webhook needed: workflows are triggered by Actions events).
 
 - Repository permissions: Contents **read**, Issues **read and write**, Pull requests **read and write**,
