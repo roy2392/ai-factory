@@ -3,7 +3,8 @@
 ## 1. Goals and non-goals
 
 **Goals**
-- Issue → merged PR with a human approving every merge.
+- Issue → merged PR behind a configurable merge gate: required CI plus Copilot code review, and optionally
+  human approvals (`required_approving_review_count` in the ruleset).
 - Everything runs in GitHub: Actions, Copilot coding agent, Copilot CLI, Copilot code review.
 - One factory repo serves many target repos through reusable workflows and a per-repo config file.
 - The model never holds a credential that can push, merge or create issues (same as piomin's design).
@@ -11,7 +12,7 @@
 
 **Non-goals**
 - Self-hosted models, GPUs or clusters.
-- Replacing human review. Auto-merge only fires after the required approval and checks.
+- Bypassing the merge gate. Auto-merge only fires after the ruleset's required checks and reviews pass.
 - Supporting forks or outside contributors as triggers.
 
 ## 2. Mapping from piomin/ai-software-factory
