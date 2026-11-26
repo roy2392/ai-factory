@@ -8,15 +8,50 @@ Inspired by [piomin/ai-software-factory](https://github.com/piomin/ai-software-f
 same on OpenShift + Tekton + vLLM + OpenCode. Here there is no cluster, no GPU and no webhook endpoint:
 every moving part runs inside GitHub.
 
+![AI Factory on GitHub overview](docs/diagrams/factory-overview.svg)
+*The factory at a glance: two ways in (a GitHub event, or the hourly scan of `requirements` issues), the
+reusable workflows on GitHub Actions, Copilot (CLI for thinking, coding agent for code), the pull request
+behind the merge gate, and the loop back: a merged pull request closes its task sub-issue and the next scan
+releases the tasks that were waiting.*
+
 ```
-Issue opened ──► dispatch ──► (plan gate?) ──► Copilot coding agent ──► draft PR
-                                                     │
-PR ready ──► Copilot code review + CI + human approval ──► auto-merge ──► issue closed
-"@copilot …" on PR ──► Copilot pushes to the same PR (native)
-CI red on copilot/* ──► self-heal ──► "@copilot fix …" (max N)
-"/ai ask|do|go" on issue ──► answer / implement / approve plan
-"requirements" issue ──► planner ──► sub-issues with blocked-by ──► released 3 at a time ──► Copilot
+GitHub (issue, /ai comment, PR review, CI run)
+   │  workflow trigger (no webhook endpoint)
+   ▼
+ai-factory.yml in the target repo ──► reusable workflow from this repo, pinned @v1.1
+                                        └─ filters.ts   (who / what / which event is allowed)
+                                           │
+              ┌────────────────────────────┘
+              ▼
+   filter ─► plan gate? ─► assign ─► Copilot coding agent ─► PR ─► CI + Copilot review ─► merge
+                │             │              │                       │
+          Copilot CLI     user token     own sandbox,          fails: self-heal sends
+          writes a plan   (Copilot seat) copilot/* branch      the log to @copilot
 ```
+
+## What it does
+
+| Workflow | Triggered by | What happens |
+|---|---|---|
+| `dispatch` | a new or labeled issue (`issues` / `opened`, `labeled`) | Filters the author and labels, optionally posts a checklist plan, assigns the issue to the Copilot coding agent and labels it `ai:in-progress`. |
+| `ai-command` | an issue comment `/ai ask\|do\|plan\|go\|stop` | A question gets a read-only answer from Copilot CLI; `do`/`go` assign Copilot with the instruction or the plan; `stop` hands the issue back to humans. |
+| native `@copilot` | a pull request review or comment | Copilot reads the conversation, pushes to the same branch and lists anything it did not do (review-triage agent). |
+| `automerge` | a Copilot pull request (`pull_request_target`) | Enables auto-merge; the branch ruleset merges it once CI `verify` and the Copilot code review pass. |
+| `self-heal` | a failed CI run on a Copilot PR (`workflow_run`) | Sends the log tail to `@copilot`, up to `max_fix_attempts`, then labels `ai:human-needed`. |
+| `watchdog` | every 30 minutes | Flags stale drafts and stale in-progress issues, cleans up labels after a merge. |
+| `requirements` | hourly, and edits of issues labeled `requirements` | Compares the requirements with the code and creates task sub-issues with "blocked by" links, at most 3 in progress at a time; reviews for gaps when all are closed. |
+
+### Scenario 1: new issue
+
+![Scenario 1: new issue](docs/diagrams/new-issue.svg)
+
+### Scenario 2: comment on an issue
+
+![Scenario 2: comment on an issue](docs/diagrams/issue-comment.svg)
+
+### Scenario 3: review of a pull request
+
+![Scenario 3: review of a pull request](docs/diagrams/pr-review.svg)
 
 ## How it is organised
 

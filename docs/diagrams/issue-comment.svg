@@ -1,0 +1,115 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1420" height="900" viewBox="0 0 1420 900">
+<defs><marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 Z" fill="#1F2A44"/></marker><marker id="ag" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 Z" fill="#1F9D55"/></marker><marker id="ar" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 Z" fill="#E60000"/></marker><marker id="ao" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 Z" fill="#F59E0B"/></marker><marker id="ax" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 Z" fill="#6B7280"/></marker></defs>
+<rect width="1420" height="900" fill="#FFFFFF"/>
+<text x="24" y="36" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="26" font-weight="700" fill="#1F2A44">Scenario 2: comment on an issue</text>
+<text x="24" y="58" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="15" font-weight="400" fill="#5B6678">A member writes /ai ask, do, plan, go or stop. Questions get a read-only answer; change requests go to the Copilot coding agent.</text>
+<rect x="20" y="70" width="1380" height="192" rx="16" fill="#F3F4F6" stroke="#C9CED6" stroke-width="1.6"/>
+<text x="36" y="94" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="13" font-weight="700" fill="#57606A">GITHUB</text>
+<rect x="40" y="104" width="180" height="128" rx="14" fill="#FFFFFF" stroke="#24292F" stroke-width="2.2"/>
+<g transform="translate(54,118) scale(0.9167)"><circle cx="24" cy="15" r="9" fill="#24292F"/><path d="M6 44 Q6 27 24 27 Q42 27 42 44 Z" fill="#24292F"/></g>
+<text x="110" y="138" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="16" font-weight="700" fill="#1F2A44">Member</text>
+<text x="110" y="158" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="13.5" font-weight="400" fill="#5B6678">comments</text>
+<text x="54" y="188" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="13.5" font-weight="700" fill="#1F2A44">/ai &lt;command&gt;</text>
+<text x="54" y="208" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="13.5" font-weight="400" fill="#5B6678">issue_comment</text>
+<rect x="236" y="104" width="944" height="128" rx="14" fill="#FFFFFF" stroke="#24292F" stroke-width="2.2"/>
+<g transform="translate(250,118) scale(0.9167)"><circle cx="13" cy="9" r="5.5" fill="none" stroke="#24292F" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="13" cy="39" r="5.5" fill="none" stroke="#24292F" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="35" cy="17" r="5.5" fill="none" stroke="#24292F" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M13 15 V33 M35 23 Q35 29 13 31" fill="none" stroke="#24292F" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/></g>
+<text x="306" y="138" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="16" font-weight="700" fill="#1F2A44">Repository</text>
+<text x="306" y="158" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="13.5" font-weight="400" fill="#5B6678">the issue thread</text>
+<rect x="290" y="185" width="170" height="32" rx="16" fill="#F3F4F6" stroke="#C9CED6" stroke-width="1.6"/>
+<text x="375.0" y="206" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="13.5" font-weight="700" fill="#1F2A44">eyes reaction</text>
+<rect x="1000" y="185" width="170" height="32" rx="16" fill="#F3F4F6" stroke="#C9CED6" stroke-width="1.6"/>
+<text x="1085.0" y="206" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="13.5" font-weight="700" fill="#1F2A44">answer / plan</text>
+<rect x="1196" y="104" width="174" height="128" rx="14" fill="#FFFFFF" stroke="#24292F" stroke-width="2.2"/>
+<g transform="translate(1210,118) scale(0.9167)"><circle cx="14" cy="24" r="9" fill="none" stroke="#24292F" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M23 24 H44 M36 24 V32 M42 24 V30" fill="none" stroke="#24292F" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/></g>
+<text x="1266" y="138" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="16" font-weight="700" fill="#1F2A44">GitHub App</text>
+<text x="1266" y="158" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="13.5" font-weight="400" fill="#5B6678">bot identity</text>
+<text x="1210" y="188" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="13.5" font-weight="700" fill="#1F2A44">App token</text>
+<text x="1210" y="208" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="13.5" font-weight="400" fill="#5B6678">posts, labels</text>
+<rect x="20" y="276" width="1380" height="290" rx="16" fill="#FBF8FF" stroke="#8250DF" stroke-width="2.2"/>
+<text x="36" y="298" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="13" font-weight="700" fill="#6E40C9">GITHUB ACTIONS</text>
+<rect x="34" y="308" width="1352" height="244" rx="16" fill="#E8F1FB" stroke="#9DBBE3" stroke-width="1.6"/>
+<text x="52" y="538" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="13" font-weight="700" fill="#245A9E">workflow run: reusable-ai-command.yml</text>
+<rect x="60" y="370" width="196" height="110" rx="14" fill="#FFFFFF" stroke="#2563EB" stroke-width="2.2"/>
+<g transform="translate(74,384) scale(0.9167)"><circle cx="11" cy="11" r="6" fill="none" stroke="#2563EB" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="37" cy="24" r="6" fill="none" stroke="#2563EB" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="11" cy="37" r="6" fill="none" stroke="#2563EB" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M17 11 H24 Q28 11 28 16 V20 Q28 24 31 24 M17 37 H24 Q28 37 28 32 V28 Q28 24 31 24" fill="none" stroke="#2563EB" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/></g>
+<text x="130" y="404" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="16" font-weight="700" fill="#1F2A44">ai-factory.yml</text>
+<text x="74" y="454" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="13.5" font-weight="400" fill="#5B6678">thin caller,</text>
+<text x="74" y="474" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="13.5" font-weight="400" fill="#5B6678">issues only</text>
+<rect x="276" y="370" width="196" height="110" rx="14" fill="#FFFFFF" stroke="#2563EB" stroke-width="2.2"/>
+<g transform="translate(290,384) scale(0.9167)"><path d="M5 7 H43 L29 25 V40 L19 45 V25 Z" fill="#2563EB"/></g>
+<text x="346" y="404" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="16" font-weight="700" fill="#1F2A44">parse</text>
+<text x="290" y="454" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="13.5" font-weight="400" fill="#5B6678">known command?</text>
+<text x="290" y="474" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="13.5" font-weight="400" fill="#5B6678">allowed author?</text>
+<rect x="492" y="370" width="196" height="110" rx="14" fill="#FFFFFF" stroke="#2563EB" stroke-width="2.2"/>
+<g transform="translate(506,384) scale(0.9167)"><rect x="7" y="14" width="34" height="27" rx="8" fill="none" stroke="#2563EB" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="18" cy="27" r="3.5" fill="#2563EB"/><circle cx="30" cy="27" r="3.5" fill="#2563EB"/><path d="M24 14 V7 M3 25 V31 M45 25 V31" stroke="#2563EB" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="24" cy="6" r="3" fill="#2563EB"/></g>
+<text x="562" y="404" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="16" font-weight="700" fill="#1F2A44">do / go</text>
+<text x="506" y="454" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="13.5" font-weight="400" fill="#5B6678">assign Copilot with</text>
+<text x="506" y="474" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="13.5" font-weight="400" fill="#5B6678">the instruction</text>
+<rect x="708" y="370" width="196" height="110" rx="14" fill="#FFFFFF" stroke="#2563EB" stroke-width="2.2"/>
+<g transform="translate(722,384) scale(0.9167)"><circle cx="24" cy="24" r="18" fill="none" stroke="#2563EB" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M16 16 L32 32 M32 16 L16 32" stroke="#2563EB" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/></g>
+<text x="778" y="404" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="16" font-weight="700" fill="#1F2A44">stop</text>
+<text x="722" y="454" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="13.5" font-weight="400" fill="#5B6678">unassign Copilot,</text>
+<text x="722" y="474" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="13.5" font-weight="400" fill="#5B6678">label ai:manual</text>
+<rect x="924" y="370" width="196" height="110" rx="14" fill="#FFFFFF" stroke="#F59E0B" stroke-width="3.4"/>
+<g transform="translate(938,384) scale(0.9167)"><rect x="4" y="8" width="40" height="32" rx="5" fill="#24292F"/><path d="M12 18 L19 24 L12 30 M23 31 H33" fill="none" stroke="#FFFFFF" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/></g>
+<text x="994" y="404" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="16" font-weight="700" fill="#1F2A44">think job</text>
+<text x="938" y="454" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="13.5" font-weight="400" fill="#5B6678">Copilot CLI, read-</text>
+<text x="938" y="474" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="13.5" font-weight="400" fill="#5B6678">only, no write token</text>
+<rect x="1140" y="370" width="196" height="110" rx="14" fill="#FFFFFF" stroke="#2563EB" stroke-width="2.2"/>
+<g transform="translate(1154,384) scale(0.9167)"><path d="M24 4 L41 10 V23 Q41 37 24 44 Q7 37 7 23 V10 Z" fill="none" stroke="#2563EB" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M16 24 L22 30 L32 18" fill="none" stroke="#2563EB" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/></g>
+<text x="1210" y="404" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="16" font-weight="700" fill="#1F2A44">apply job</text>
+<text x="1154" y="454" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="13.5" font-weight="400" fill="#5B6678">validate the output,</text>
+<text x="1154" y="474" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="13.5" font-weight="400" fill="#5B6678">App posts it</text>
+<rect x="20" y="600" width="1380" height="190" rx="16" fill="#E7F6EC" stroke="#8CCBA3" stroke-width="1.6"/>
+<text x="36" y="624" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="13" font-weight="700" fill="#1D7A45">COPILOT  (GitHub-hosted)</text>
+<rect x="492" y="640" width="196" height="120" rx="14" fill="#FFFFFF" stroke="#F59E0B" stroke-width="3.4"/>
+<g transform="translate(506,654) scale(0.9167)"><rect x="7" y="14" width="34" height="27" rx="8" fill="none" stroke="#B45309" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="18" cy="27" r="3.5" fill="#B45309"/><circle cx="30" cy="27" r="3.5" fill="#B45309"/><path d="M24 14 V7 M3 25 V31 M45 25 V31" stroke="#B45309" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="24" cy="6" r="3" fill="#B45309"/></g>
+<text x="562" y="674" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="16" font-weight="700" fill="#1F2A44">Coding agent</text>
+<text x="506" y="724" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="13.5" font-weight="400" fill="#5B6678">same path as</text>
+<text x="506" y="744" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="13.5" font-weight="400" fill="#5B6678">scenario 1 (5-10)</text>
+<rect x="924" y="640" width="196" height="120" rx="14" fill="#FFFFFF" stroke="#1F9D55" stroke-width="2.4"/>
+<g transform="translate(938,654) scale(0.9167)"><rect x="12" y="12" width="24" height="24" rx="3" fill="none" stroke="#1F9D55" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/><rect x="19" y="19" width="10" height="10" fill="#1F9D55"/><path d="M18 5 V12 M24 5 V12 M30 5 V12 M18 36 V43 M24 36 V43 M30 36 V43 M5 18 H12 M5 24 H12 M5 30 H12 M36 18 H43 M36 24 H43 M36 30 H43" stroke="#1F9D55" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/></g>
+<text x="994" y="674" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="16" font-weight="700" fill="#1F2A44">Copilot models</text>
+<text x="938" y="724" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="13.5" font-weight="400" fill="#5B6678">answers from the</text>
+<text x="938" y="744" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="13.5" font-weight="400" fill="#5B6678">repo and thread</text>
+<path d="M130 232 V368" fill="none" stroke="#1F2A44" stroke-width="2.4" marker-end="url(#ah)"/>
+<circle cx="130" cy="262" r="11" fill="#E60000" stroke="#FFFFFF" stroke-width="2"/>
+<text x="130" y="266.5" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="13" font-weight="700" fill="#FFFFFF">1</text>
+<text x="148" y="254" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="13.5" font-weight="700" fill="#1F2A44">issue_comment</text>
+<path d="M256 425 H274" fill="none" stroke="#1F2A44" stroke-width="2.4" marker-end="url(#ah)"/>
+<circle cx="266" cy="398" r="11" fill="#E60000" stroke="#FFFFFF" stroke-width="2"/>
+<text x="266" y="402.5" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="13" font-weight="700" fill="#FFFFFF">2</text>
+<path d="M374 368 V219" fill="none" stroke="#1F2A44" stroke-width="2.4" marker-end="url(#ah)"/>
+<circle cx="374" cy="262" r="11" fill="#E60000" stroke="#FFFFFF" stroke-width="2"/>
+<text x="374" y="266.5" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="13" font-weight="700" fill="#FFFFFF">3</text>
+<text x="382" y="296" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="13.5" font-weight="700" fill="#1F2A44">react, or reply with help</text>
+<path d="M472 425 H490" fill="none" stroke="#1F2A44" stroke-width="2.4" marker-end="url(#ah)"/>
+<circle cx="482" cy="398" r="11" fill="#E60000" stroke="#FFFFFF" stroke-width="2"/>
+<text x="482" y="402.5" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="13" font-weight="700" fill="#FFFFFF">4</text>
+<path d="M590 480 V638" fill="none" stroke="#F59E0B" stroke-width="2.4" marker-end="url(#ao)"/>
+<text x="598" y="590" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="13.5" font-weight="700" fill="#B45309">assign</text>
+<path d="M440 480 V510 H806 V482" fill="none" stroke="#1F2A44" stroke-width="2.4" marker-end="url(#ah)"/>
+<circle cx="806" cy="510" r="11" fill="#E60000" stroke="#FFFFFF" stroke-width="2"/>
+<text x="806" y="514.5" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="13" font-weight="700" fill="#FFFFFF">5</text>
+<text x="640" y="530" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="13.5" font-weight="700" fill="#1F2A44">stop</text>
+<path d="M420 370 V346 H1022 V368" fill="none" stroke="#1F2A44" stroke-width="2.4" marker-end="url(#ah)"/>
+<circle cx="1022" cy="346" r="11" fill="#E60000" stroke="#FFFFFF" stroke-width="2"/>
+<text x="1022" y="350.5" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="13" font-weight="700" fill="#FFFFFF">6</text>
+<text x="780" y="340" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="13.5" font-weight="700" fill="#1F2A44">ask / plan</text>
+<path d="M1022 480 V638" fill="none" stroke="#1F9D55" stroke-width="2.4" marker-start="url(#ag)" marker-end="url(#ag)"/>
+<circle cx="1022" cy="560" r="11" fill="#E60000" stroke="#FFFFFF" stroke-width="2"/>
+<text x="1022" y="564.5" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="13" font-weight="700" fill="#FFFFFF">7</text>
+<path d="M1120 425 H1138" fill="none" stroke="#1F2A44" stroke-width="2.4" marker-end="url(#ah)"/>
+<circle cx="1130" cy="398" r="11" fill="#E60000" stroke="#FFFFFF" stroke-width="2"/>
+<text x="1130" y="402.5" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="13" font-weight="700" fill="#FFFFFF">8</text>
+<text x="1172" y="360" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="13.5" font-weight="700" fill="#1F2A44">out/ artifact</text>
+<path d="M1160 370 V219" fill="none" stroke="#1F2A44" stroke-width="2.4" marker-end="url(#ah)"/>
+<circle cx="1160" cy="262" r="11" fill="#E60000" stroke="#FFFFFF" stroke-width="2"/>
+<text x="1160" y="266.5" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="13" font-weight="700" fill="#FFFFFF">9</text>
+<text x="1152" y="296" text-anchor="end" font-family="Helvetica, Arial, sans-serif" font-size="13.5" font-weight="700" fill="#1F2A44">answer or plan comment</text>
+<rect x="20" y="818" width="1380" height="56" rx="16" fill="#FFFFFF" stroke="#C9CED6" stroke-width="1.6"/>
+<rect x="38" y="832" width="28" height="28" rx="6" fill="#FFFFFF" stroke="#F59E0B" stroke-width="3"/>
+<text x="76" y="851" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="15" font-weight="700" fill="#1F2A44">Copilot runs here</text>
+<rect x="236" y="832" width="28" height="28" rx="6" fill="#F8F5FF" stroke="#8250DF" stroke-width="2"/>
+<text x="274" y="851" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="15" font-weight="700" fill="#1F2A44">GitHub Actions</text>
+<text x="420" y="851" text-anchor="start" font-family="Helvetica, Arial, sans-serif" font-size="14.5" font-weight="400" fill="#5B6678">Only OWNER, MEMBER and COLLABORATOR comments count. Bots never trigger anything.</text>
+</svg>
